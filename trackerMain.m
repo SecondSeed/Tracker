@@ -274,9 +274,10 @@ for frame = 1:num_frames
             % im = insertShape(im, 'Rectangle', expert(6).rect_position(frame,:), 'LineWidth', 3, 'Color', 'green');  
             % im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red'); 
             %%% final result
+            %im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
             im = insertShape(im, 'Rectangle', Final_rect_position, 'LineWidth', 3, 'Color', 'red');
             % Display the annotated video frame using the video player object.
-            step(p.videoPlayer, im);
+            step(p.videoPlayer, im_patch_cf);
        else
             figure(1)
             imshow(uint8(im),'border','tight');
