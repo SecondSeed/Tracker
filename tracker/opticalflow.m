@@ -17,13 +17,13 @@ for frame = 1:num_frame
    drawnow
 end
 
-function out = getOpticalFlow(img, pos, target_sz)
-
-%RGB图转成灰度图
-if numel(img) > 2
-    img = rgb2gray(img)
-end
-
-opticFlow = opticalFlowLK('NoiseThreshold', 0.009);
+% function out = getOpticalFlow(img, pos, target_sz)
+% 
+% %RGB图转成灰度图
+% if numel(img) > 2
+%     img = rgb2gray(img)
+% end
+% 
+% opticFlow = opticalFlowLK('NoiseThreshold', 0.009);
 
 

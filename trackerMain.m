@@ -17,6 +17,9 @@ output_rect_positions(num_frames, 4) = 0;
 
 % patch of the target + padding
 patch_padded = getSubwindow(im, pos, p.norm_bg_area, bg_area);
+
+
+
 % initialize hist model
 new_pwp_model = true;
 [bg_hist, fg_hist] = updateHistModel(new_pwp_model, patch_padded, bg_area, fg_area, target_sz, p.norm_bg_area, p.n_bins, p.grayscale_sequence);
@@ -72,7 +75,7 @@ for frame = 1:num_frames
        t_imread = t_imread + toc(tic_imread);
        % extract patch of size bg_area and resize to norm_bg_area
        im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
-
+        im_flow = zeros(size(im, 1), size(im, 2), size(im, 3));
        % color histogram (mask)
        [likelihood_map] = getColourMap(im_patch_cf, bg_hist, fg_hist, p.n_bins, p.grayscale_sequence);
        likelihood_map(isnan(likelihood_map)) = 0;
@@ -194,8 +197,11 @@ for frame = 1:num_frames
        fg_area = fg_area + mod(bg_area - fg_area, 2);
        % Compute the rectangle with (or close to) params.fixed_area and same aspect ratio as the target bboxgetScaleSubwindow
        area_resize_factor = sqrt(p.fixed_area/prod(bg_area));
-  end
+   end
 
+  % initialize optical flow model
+
+   
     % extract patch of size bg_area and resize to norm_bg_area
     im_patch_bg = getSubwindow(im, pos, p.norm_bg_area, bg_area);
     % compute feature map, of cf_response_size
@@ -277,7 +283,7 @@ for frame = 1:num_frames
             %im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
             im = insertShape(im, 'Rectangle', Final_rect_position, 'LineWidth', 3, 'Color', 'red');
             % Display the annotated video frame using the video player object.
-            step(p.videoPlayer, im_patch_cf);
+            step(p.videoPlayer, im);
        else
             figure(1)
             imshow(uint8(im),'border','tight');
