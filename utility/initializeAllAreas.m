@@ -15,7 +15,7 @@ function [params, bg_area, fg_area, area_resize_factor] = initializeAllAreas(im,
 	bg_area = round(params.target_sz + params.avg_dim * params.padding);
     
     % size for which we compute optical flow
-    params.optical_area = roudn(params.target_sz + params.avg_dim * params.optical_padding);
+    params.optical_area = round(params.target_sz + params.avg_dim * params.optical_padding);
     
 	% pick a "safe" region smaller than bbox to avoid mislabeling
 	fg_area = round(params.target_sz - params.avg_dim * params.inner_padding);

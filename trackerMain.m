@@ -18,8 +18,6 @@ output_rect_positions(num_frames, 4) = 0;
 % patch of the target + padding
 patch_padded = getSubwindow(im, pos, p.norm_bg_area, bg_area);
 
-
-
 % initialize hist model
 new_pwp_model = true;
 [bg_hist, fg_hist] = updateHistModel(new_pwp_model, patch_padded, bg_area, fg_area, target_sz, p.norm_bg_area, p.n_bins, p.grayscale_sequence);
@@ -134,6 +132,9 @@ for frame = 1:num_frames
          expert(i).smoothScore(frame) = exp(- (expert(i).smooth(frame)).^2/ (2 * p.avg_dim.^2) );
       end
       
+      %compute optical flow 
+      optic_im = makeMask(im, pos, p.optical_area);
+      flow = estimateFlow(opticFlow, optic_im);
       if frame > period - 1 
          for i = 1:expertNum
              % expert robustness evaluation
@@ -199,9 +200,6 @@ for frame = 1:num_frames
        area_resize_factor = sqrt(p.fixed_area/prod(bg_area));
    end
 
-  % initialize optical flow model
-
-   
     % extract patch of size bg_area and resize to norm_bg_area
     im_patch_bg = getSubwindow(im, pos, p.norm_bg_area, bg_area);
     % compute feature map, of cf_response_size
@@ -231,6 +229,11 @@ for frame = 1:num_frames
            hf_den_deep{ii} = new_hf_den_deep{ii};
            hf_num_deep{ii} = new_hf_num_deep{ii};
         end
+        
+        % first frame initialize optical flow model
+        opticFlow = opticalFlowFarneback;
+        optic_im = makeMask(im, pos, p.optical_area);
+        flow = estimateFlow(opticFlow, optic_im);
     else          
         % subsequent frames, update the model by linear interpolation
         hf_den = (1 - learning_rate_cf) * hf_den + learning_rate_cf * new_hf_den;
@@ -282,8 +285,15 @@ for frame = 1:num_frames
             %%% final result
             %im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
             im = insertShape(im, 'Rectangle', Final_rect_position, 'LineWidth', 3, 'Color', 'red');
+            %im = insertShape(im, flow, 'DecimationFactor', [5, 5], 'ScaleFactor', 10);
+            hold off;
+            imshow(im);
+            hold on;
+            plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);
+            drawnow
             % Display the annotated video frame using the video player object.
-            step(p.videoPlayer, im);
+            %step(p.videoPlayer, im);
+            %plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);
        else
             figure(1)
             imshow(uint8(im),'border','tight');

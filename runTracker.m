@@ -12,8 +12,8 @@ enableGPU = true;
 params.visualization = 1;                  % show output bbox on frame
 
 %% load video info
-videoname = 'Basketball'; 
-img_path = 'sequence/Basketball/img/';
+videoname = 'Rubik'; 
+img_path = 'sequence/Rubik/img/';
 base_path = 'sequence/';
 [img_files, pos, target_sz, video_path] = load_video_info(base_path, videoname);
 
