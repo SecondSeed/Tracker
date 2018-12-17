@@ -13,6 +13,7 @@ num_frames = numel(p.img_files);
 meanScore(1, num_frames) = 0;
 PSRScore(1, num_frames) = 0;
 IDensemble(1, expertNum) = 0;
+flowScore(1, expertNum) = 0;
 output_rect_positions(num_frames, 4) = 0;
 
 % patch of the target + padding
@@ -73,7 +74,6 @@ for frame = 1:num_frames
        t_imread = t_imread + toc(tic_imread);
        % extract patch of size bg_area and resize to norm_bg_area
        im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
-        im_flow = zeros(size(im, 1), size(im, 2), size(im, 3));
        % color histogram (mask)
        [likelihood_map] = getColourMap(im_patch_cf, bg_hist, fg_hist, p.n_bins, p.grayscale_sequence);
        likelihood_map(isnan(likelihood_map)) = 0;
@@ -133,13 +133,21 @@ for frame = 1:num_frames
       end
       
       %compute optical flow 
+      if p.enableopticalflow == 1
       optic_im = makeMask(im, pos, p.optical_area);
       flow = estimateFlow(opticFlow, optic_im);
+      end
+      %score = calculateOpticalScore(flow,);
       if frame > period - 1 
          for i = 1:expertNum
+             % expert optical flow reliability
+             if p.enableopticalflow == 1
+             expert(i).flowscore(frame) = calculateOpticalScore(flow, pos, target_sz, expert(i).rect_position(frame, :));
+             end           
              % expert robustness evaluation
              expert(i).RobScore(frame) = RobustnessEva(expert, i, frame, period, weight, expertNum);
              IDensemble(i) = expert(i).RobScore(frame);
+             flowScore(i) = expert(i).flowscore(frame);
          end
          meanScore(frame) = sum(IDensemble)/expertNum;       
          [~, ID] = sort(IDensemble, 'descend'); 
@@ -231,9 +239,11 @@ for frame = 1:num_frames
         end
         
         % first frame initialize optical flow model
+        if p.enableopticalflow == 1
         opticFlow = opticalFlowFarneback;
         optic_im = makeMask(im, pos, p.optical_area);
         flow = estimateFlow(opticFlow, optic_im);
+        end
     else          
         % subsequent frames, update the model by linear interpolation
         hf_den = (1 - learning_rate_cf) * hf_den + learning_rate_cf * new_hf_den;
@@ -288,8 +298,10 @@ for frame = 1:num_frames
             %im = insertShape(im, flow, 'DecimationFactor', [5, 5], 'ScaleFactor', 10);
             hold off;
             imshow(im);
+            if p.showflow == 1
             hold on;
             plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);
+            end
             drawnow
             % Display the annotated video frame using the video player object.
             %step(p.videoPlayer, im);
