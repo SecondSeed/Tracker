@@ -15,7 +15,7 @@ scaledTarget = [targetSize(1) .* scales; targetSize(2) .* scales];
 % extract scaled crops for search region x at previous target position
 x_crops = make_scale_pyramid(im, targetPosition, scaledInstance, p.instanceSize, avgChans, stats, p);
 % evaluate the offline-trained network for exemplar x features
-[newTargetPosition, newScale, response] = tracker_eval2(p.net_x, round(s_x), scoreId, z_features, x_crops, targetPosition, window, p);
+[newTargetPosition, newScale, response] = tracker_eval2(p.net_x, round(s_x), p.scoreId, z_features, x_crops, targetPosition, window, p);
 targetPosition = gather(newTargetPosition);
 % scale damping and saturation
 %s_x = max(min_s_x, min(max_s_x, (1-p.scaleLR)*s_x + p.scaleLR*scaledInstance(newScale)));

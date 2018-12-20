@@ -37,7 +37,7 @@ function [z_features, s_x, avgChans] = calculate_model_feature(cpu_im, pos, sz, 
 %     scales = (p.scaleStep .^ ((ceil(p.numScale/2)-p.numScale) : floor(p.numScale/2)));
     % evaluate the offline-trained network for exemplar z features
     p.net_z.eval({'exemplar', z_crop});
-    z_features = p.net_z.vars(zFeatId).value;
+    z_features = p.net_z.vars(p.zFeatId).value;
 %     z_features = repmat(z_features, [1 1 1 p.numScale]);
 
 % 

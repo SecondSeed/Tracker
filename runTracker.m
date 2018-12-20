@@ -14,8 +14,8 @@ params.enableopticalflow = 1;
 params.showflow = 0;
 
 %% load video info
-videoname = 'Matrix'; 
-img_path = 'sequence/Matrix/img/';
+videoname = 'Woman'; 
+img_path = 'sequence/Woman/img/';
 base_path = 'sequence/';
 [img_files, pos, target_sz, video_path] = load_video_info(base_path, videoname);
 
@@ -30,7 +30,7 @@ params.lambda = 1e-4;                      % regularization weight
 params.lr_cf_init = 0.01;                  % DCF learning rate
 params.period = 5;                         % time period, \Delta t
 params.update_thres = 0.7;                 % threshold for adaptive update
-params.expertNum = 7; 
+params.expertNum = 9; 
 
 %% scale related
 params.hog_scale_cell_size = 4;            % from DSST 
@@ -59,5 +59,7 @@ params.target_sz = target_sz;
 if params.visualization
     params.videoPlayer = vision.VideoPlayer('Position', [100 100 [size(im,2), size(im,1)]+30]);
 end
+% ³õÊ¼»¯ÍøÂç
+saimese = initial_saimese();
 % start the actual tracking
-trackerMain(params, im, bg_area, fg_area, area_resize_factor);
+trackerMain(params, im, bg_area, fg_area, area_resize_factor, saimese);

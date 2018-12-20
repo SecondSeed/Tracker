@@ -1,4 +1,4 @@
-function [results] = trackerMain(p, im, bg_area, fg_area, area_resize_factor)
+function [results] = trackerMain(p, im, bg_area, fg_area, area_resize_factor, saimese)
 
 pos = p.init_pos;
 target_sz = p.target_sz;
@@ -15,6 +15,19 @@ PSRScore(1, num_frames) = 0;
 IDensemble(1, expertNum) = 0;
 flowScore(1, expertNum) = 0;
 output_rect_positions(num_frames, 4) = 0;
+
+saimese_window = make_window(saimese);
+stats = [];
+
+
+% 自适应的专家和改进的专家
+experts_params = ones(expertNum, 1, 3);
+experts_params(:, :, :) = [[1, 0, 0]; [0, 1, 0]; [0, 0, 1]; [0.33, 0.67, 0];...
+                           [0.33, 0, 0.67]; [0, 0.33, 0.67]; [0.013, 0.33, 0.657];...
+                           [0.1, 0.3, 0.6]; [0.1, 0.3, 0.6]];
+% self_adaption_expert = ones(1, 1, 3);
+% self_adaption_expert(1, 1, :) = [0.6, 0.3, 0.1];
+% improve_expert = [];
 
 % patch of the target + padding
 patch_padded = getSubwindow(im, pos, p.norm_bg_area, bg_area);
@@ -113,14 +126,17 @@ for frame = 1:num_frames
       responseDeepHigh = mexResize(responseDeepHigh, p.norm_delta_area,'auto');
       % Construct multiple experts
       % the weights of High, Middle, Low features are [1, 0.5, 0.02] 
-      expert(1).response = responseHandLow;
-      expert(2).response = responseDeepMiddle;
-      expert(3).response = responseDeepHigh;
-      expert(4).response = responseDeepMiddle + 0.5 * responseHandLow;
-      expert(5).response = responseDeepHigh + 0.5 * responseHandLow;
-      expert(6).response = responseDeepHigh + 0.5 * responseDeepMiddle;
-      expert(7).response = responseDeepHigh + 0.5 * responseDeepMiddle + 0.02 * responseHandLow;
-   
+      response_cat = cat(3, responseHandLow, responseDeepMiddle, responseDeepHigh);
+      for i = 1: expertNum
+         expert(i).response =  sum(bsxfun(@times, response_cat, experts_params(i)), 3);
+      end
+      
+      % run saimese
+      [model_feature, s_x, avgChans] = calculate_model_feature(last_im, pos, target_sz, saimese);
+      [saimese_response, saipos, saisz] = calculate_response(saimese, im, s_x, model_feature,...
+                                                             pos, target_sz, avgChans, stats, saimese_window);
+      % im assign to last_im
+      last_im = im;
       center = (1 + p.norm_delta_area) / 2;
       for i = 1:expertNum
          [row, col] = find(expert(i).response == max(expert(i).response(:)), 1);
@@ -238,6 +254,7 @@ for frame = 1:num_frames
            hf_num_deep{ii} = new_hf_num_deep{ii};
         end
         
+        last_im = im;
         % first frame initialize optical flow model
         if p.enableopticalflow == 1
         opticFlow = opticalFlowFarneback;

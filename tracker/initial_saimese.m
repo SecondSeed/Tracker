@@ -1,10 +1,10 @@
 function saimese = initial_saimese()
     saimese.gpus = 1;
 %     remove Scale for MCCT
-%     saimese.numScale = 3;
-%     saimese.scaleStep = 1.0375;
-%     saimese.scalePenalty = 0.9745;
-%     saimese.scaleLR = 0.59; % damping factor for scale update
+    saimese.numScale = 1;
+    saimese.scaleStep = 1.0375;
+    saimese.scalePenalty = 0.9745;
+    saimese.scaleLR = 0.59; % damping factor for scale update
 
     saimese.responseUp = 16; % upsampling the small 17x17 response helps with the accuracy
     saimese.windowing = 'cosine'; % to penalize large displacements
@@ -49,7 +49,7 @@ function saimese = initial_saimese()
     end
     % Load two copies of the pre-trained network
     saimese.net_z = load_pretrained([saimese.net_base_path saimese.net], saimese.gpus);
-    saimese.net_x = load_pretrained([saimese.net_base_path saimese.net], saimese.gpus); % 改了这个地方， 将[]改为saimese.gpus
+    saimese.net_x = load_pretrained([saimese.net_base_path saimese.net], []); % 改了这个地方， 将[]改为saimese.gpus
     %net_c = net_z;
 %     [imgFiles, targetPosition, targetSize] = load_video_info(saimese.seq_base_path, saimese.video);
 %     nImgs = numel(imgFiles);

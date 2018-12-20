@@ -33,7 +33,9 @@ function [newTargetPosition, bestScale, responseMap] = tracker_eval2(net_x, s_x,
         end
         responseMap = responseMapsUP(:,:,bestScale);
     else
-        responseMap = responseMapsUP;
+        responseMaps_cpu=gather(responseMaps);
+        responseMapsUP_cpu=imresize(responseMaps_cpu, p.responseUp, 'bicubic');
+        responseMap = gpuArray(responseMapsUP_cpu);
         bestScale = 1;
     end
     % make the response map sum to 1
