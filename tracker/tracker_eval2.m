@@ -38,11 +38,13 @@ function [newTargetPosition, bestScale, responseMap] = tracker_eval2(net_x, s_x,
         responseMap = gpuArray(responseMapsUP_cpu);
         bestScale = 1;
     end
-    % make the response map sum to 1
+    % make the response map to 0 - 1
     responseMap = responseMap - min(responseMap(:));
     responseMap = responseMap / sum(responseMap(:));
     % apply windowing
     responseMap = (1-p.wInfluence)*responseMap + p.wInfluence*window;
+    responseMap = responseMap - min(responseMap(:));
+    responseMap = responseMap / (max(responseMap(:)) - min(responseMap(:)));
     [r_max, c_max] = find(responseMap == max(responseMap(:)), 1);
     [r_max, c_max] = avoid_empty_position(r_max, c_max, p);
     p_corr = [r_max, c_max];

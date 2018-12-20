@@ -1,8 +1,8 @@
 function score = calculateOpticalScore(flow, last_pos, last_rect, rect_pos)
 %   Ximing Xiang 2018
-pos = rect_pos([2, 1]) + rect_pos([4, 3]) / 2;
+p = rect_pos([2, 1]) + rect_pos([4, 3]) / 2;
 rect = rect_pos([4, 3]);
-four_point = getFourPoint(pos, rect);
+four_point = getFourPoint(p, rect);
 four_point = four_point - last_pos;
 yv = four_point(:, 1);
 xv = four_point(:, 2);
