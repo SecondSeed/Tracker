@@ -24,7 +24,7 @@ stats = [];
 experts_params = ones(expertNum, 1, 3);
 experts_params(:, :, :) = [[1, 0, 0]; [0, 1, 0]; [0, 0, 1]; [0.33, 0.67, 0];...
                            [0.33, 0, 0.67]; [0, 0.33, 0.67]; [0.013, 0.33, 0.657];...
-                           [0.1, 0.3, 0.6]; [0.1, 0.3, 0.6]];
+                           [0.1, 0.3, 0.6]];
 % self_adaption_expert = ones(1, 1, 3);
 % self_adaption_expert(1, 1, :) = [0.6, 0.3, 0.1];
 % improve_expert = [];
@@ -128,13 +128,19 @@ for frame = 1:num_frames
       % the weights of High, Middle, Low features are [1, 0.5, 0.02] 
       response_cat = cat(3, responseHandLow, responseDeepMiddle, responseDeepHigh);
       for i = 1: expertNum
-         expert(i).response =  sum(bsxfun(@times, response_cat, experts_params(i)), 3);
+         expert(i).response =  sum(bsxfun(@times, response_cat, experts_params(i, :, :)), 3);
       end
       
       % run saimese
+      % extract feature frome last img
       [model_feature, s_x, avgChans] = calculate_model_feature(last_im, pos, target_sz, saimese);
+      % calculate response from this img
       [saimese_response, saipos, saisz] = calculate_response(saimese, im, s_x, model_feature,...
                                                              pos, target_sz, avgChans, stats, saimese_window);
+                                                         
+      % similarity with first frame
+      [first_response, fpos, fsz] = calculate_response(saimese, im, s_x, model_feature,...
+                                                             pos, target_sz, first_avgChans, stats, saimese_window);
       % im assign to last_im
       last_im = im;
       center = (1 + p.norm_delta_area) / 2;
@@ -153,17 +159,19 @@ for frame = 1:num_frames
       optic_im = makeMask(im, pos, p.optical_area);
       flow = estimateFlow(opticFlow, optic_im);
       end
-      %score = calculateOpticalScore(flow,);
       if frame > period - 1 
          for i = 1:expertNum
+             % calculate expert similarity score
+             expert(i).similarityScore = calculateSimilarityScore(expert(i).pos, pos, saimese_response, s_x);  
+             expert(i).fsim = calculateSimilarityScore(expert(i).pos, pos, first_response, s_x);
              % expert optical flow reliability
              if p.enableopticalflow == 1
-             expert(i).flowscore(frame) = calculateOpticalScore(flow, pos, target_sz, expert(i).rect_position(frame, :));
+             expert(i).flowscore = calculateOpticalScore(flow, pos, target_sz, expert(i).rect_position(frame, :));
              end           
              % expert robustness evaluation
-             expert(i).RobScore(frame) = RobustnessEva(expert, i, frame, period, weight, expertNum);
-             IDensemble(i) = expert(i).RobScore(frame);
-             flowScore(i) = expert(i).flowscore(frame);
+             expert(i).RobScore = RobustnessEva(expert, i, frame, period, weight, expertNum);
+             IDensemble(i) = expert(i).RobScore;
+             flowScore(i) = expert(i).flowscore;
          end
          meanScore(frame) = sum(IDensemble)/expertNum;       
          [~, ID] = sort(IDensemble, 'descend'); 
@@ -254,6 +262,8 @@ for frame = 1:num_frames
            hf_num_deep{ii} = new_hf_num_deep{ii};
         end
         
+        % extract features from first frame
+        [first_feature, first_sx, first_avgChans] = calculate_model_feature(im, pos, target_sz, saimese);
         last_im = im;
         % first frame initialize optical flow model
         if p.enableopticalflow == 1

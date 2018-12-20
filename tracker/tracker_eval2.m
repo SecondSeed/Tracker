@@ -31,13 +31,14 @@ function [newTargetPosition, bestScale, responseMap] = tracker_eval2(net_x, s_x,
             thisPeak = max(thisResponse(:));
             if thisPeak > bestPeak, bestPeak = thisPeak; bestScale = s; end
         end
-        responseMap = responseMapsUP(:,:,bestScale);
+        responseMap = gather(responseMapsUP(:,:,bestScale));
     else
         responseMaps_cpu=gather(responseMaps);
-        responseMapsUP_cpu=imresize(responseMaps_cpu, p.responseUp, 'bicubic');
-        responseMap = gpuArray(responseMapsUP_cpu);
+        responseMap=imresize(responseMaps_cpu, p.responseUp, 'bicubic');
+%        responseMap = gpuArray(responseMapsUP_cpu);
         bestScale = 1;
     end
+    
     % make the response map to 0 - 1
     responseMap = responseMap - min(responseMap(:));
     responseMap = responseMap / sum(responseMap(:));
