@@ -2,6 +2,10 @@ function [results] = trackerMain(p, im, bg_area, fg_area, area_resize_factor, sa
 
 pos = p.init_pos;
 target_sz = p.target_sz;
+saipos = pos;
+fpos = pos;
+saisz = target_sz;
+fsz = target_sz;
 period = p.period;
 update_thres = p.update_thres;
 learning_rate_pwp = p.lr_pwp_init;
@@ -16,8 +20,9 @@ IDensemble(1, expertNum) = 0;
 flowScore(1, expertNum) = 0;
 output_rect_positions(num_frames, 4) = 0;
 
-saimese_window = make_window(saimese);
-stats = [];
+%saimese_window = make_window(saimese);
+saimese.stats = [];
+saimese.average_response = 0;
 
 
 % 自适应的专家和改进的专家
@@ -132,15 +137,19 @@ for frame = 1:num_frames
       end
       
       % run saimese
+      
+
+      
       % extract feature frome last img
       [model_feature, s_x, avgChans] = calculate_model_feature(last_im, pos, target_sz, saimese);
       % calculate response from this img
       [saimese_response, saipos, saisz] = calculate_response(saimese, im, s_x, model_feature,...
-                                                             pos, target_sz, avgChans, stats, saimese_window);
-                                                         
+          pos, target_sz, avgChans);
+      
       % similarity with first frame
-      [first_response, fpos, fsz] = calculate_response(saimese, im, s_x, model_feature,...
-                                                             pos, target_sz, first_avgChans, stats, saimese_window);
+      [first_response, fpos, fsz] = calculate_response(saimese, im, s_x, first_feature,...
+          pos, target_sz, first_avgChans);
+      
       % im assign to last_im
       last_im = im;
       center = (1 + p.norm_delta_area) / 2;
@@ -161,6 +170,9 @@ for frame = 1:num_frames
       end
       if frame > period - 1 
          for i = 1:expertNum
+             
+             expert(i).mfr = mean(first_response(:));
+             expert(i).msr = mean(saimese_response(:));
              % calculate expert similarity score
              expert(i).similarityScore = calculateSimilarityScore(expert(i).pos, pos, saimese_response, s_x);  
              expert(i).fsim = calculateSimilarityScore(expert(i).pos, pos, first_response, s_x);
@@ -307,18 +319,23 @@ for frame = 1:num_frames
         end
     end  
     output_rect_positions(frame,:) = Final_rect_position;
+    
+    srect = [saipos([2,1]) - saisz([2,1])/2, saisz([2,1])];
+    frect = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
 
    %% VISUALIZATION
     if p.visualization == 1
         if isToolboxAvailable('Computer Vision System Toolbox')
             %%% multi-expert result
-            % im = insertShape(im, 'Rectangle', expert(1).rect_position(frame,:), 'LineWidth', 3, 'Color', 'yellow');  
-            % im = insertShape(im, 'Rectangle', expert(2).rect_position(frame,:), 'LineWidth', 3, 'Color', 'black');  
-            % im = insertShape(im, 'Rectangle', expert(3).rect_position(frame,:), 'LineWidth', 3, 'Color', 'blue');  
-            % im = insertShape(im, 'Rectangle', expert(4).rect_position(frame,:), 'LineWidth', 3, 'Color', 'magenta'); 
-            % im = insertShape(im, 'Rectangle', expert(5).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');  
-            % im = insertShape(im, 'Rectangle', expert(6).rect_position(frame,:), 'LineWidth', 3, 'Color', 'green');  
-            % im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red'); 
+            im = insertShape(im, 'Rectangle', expert(1).rect_position(frame,:), 'LineWidth', 3, 'Color', 'yellow');  
+            im = insertShape(im, 'Rectangle', expert(2).rect_position(frame,:), 'LineWidth', 3, 'Color', 'black');  
+            im = insertShape(im, 'Rectangle', expert(3).rect_position(frame,:), 'LineWidth', 3, 'Color', 'blue');  
+            im = insertShape(im, 'Rectangle', expert(4).rect_position(frame,:), 'LineWidth', 3, 'Color', 'magenta'); 
+            im = insertShape(im, 'Rectangle', expert(5).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');  
+            im = insertShape(im, 'Rectangle', expert(6).rect_position(frame,:), 'LineWidth', 3, 'Color', 'green');  
+            im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red'); 
+            im = insertShape(im, 'Rectangle', srect, 'LineWidth', 3, 'Color', 'red');
+            insertShape(im, 'Rectangle', frect, 'LineWidth', 3, 'Color', 'red'); 
             %%% final result
             %im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
             im = insertShape(im, 'Rectangle', Final_rect_position, 'LineWidth', 3, 'Color', 'red');

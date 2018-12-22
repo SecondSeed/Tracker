@@ -1,4 +1,4 @@
-function [response, targetPosition, targetSize] = calculate_response(p, cpu_im, s_x, z_features, targetPosition, targetSize, avgChans, average_response, scales_array)
+function [response, targetPosition, targetSize] = calculate_response(p, cpu_im, s_x, z_features, targetPosition, targetSize, avgChans, scales_array)
 %   Luca Bertinetto, Jack Valmadre, Joao F. Henriques, 2016
 %   Modified by Ximing Xiang, 2018
 if nargin < 10, scales = [1];
