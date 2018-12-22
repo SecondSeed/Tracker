@@ -1,4 +1,4 @@
-function [response, targetPosition, targetSize] = calculate_response(p, cpu_im, s_x, z_features, targetPosition, targetSize, avgChans, stats, window, scales_array)
+function [response, targetPosition, targetSize] = calculate_response(p, cpu_im, s_x, z_features, targetPosition, targetSize, avgChans, average_response, scales_array)
 %   Luca Bertinetto, Jack Valmadre, Joao F. Henriques, 2016
 %   Modified by Ximing Xiang, 2018
 if nargin < 10, scales = [1];
@@ -13,9 +13,9 @@ end
 scaledInstance = s_x .* scales;
 scaledTarget = [targetSize(1) .* scales; targetSize(2) .* scales];
 % extract scaled crops for search region x at previous target position
-x_crops = make_scale_pyramid(im, targetPosition, scaledInstance, p.instanceSize, avgChans, stats, p);
+x_crops = make_scale_pyramid(im, targetPosition, scaledInstance, p.instanceSize, avgChans,  p);
 % evaluate the offline-trained network for exemplar x features
-[newTargetPosition, newScale, response] = tracker_eval2(p.net_x, round(s_x), p.scoreId, z_features, x_crops, targetPosition, window, p);
+[newTargetPosition, newScale, response] = tracker_eval2(round(s_x),  z_features, x_crops, targetPosition,  p);
 targetPosition = gather(newTargetPosition);
 % scale damping and saturation
 %s_x = max(min_s_x, min(max_s_x, (1-p.scaleLR)*s_x + p.scaleLR*scaledInstance(newScale)));

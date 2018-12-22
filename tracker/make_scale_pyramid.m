@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------------------------------
-function pyramid = make_scale_pyramid(im, targetPosition, in_side_scaled, out_side, avgChans, stats, p)
+function pyramid = make_scale_pyramid(im, targetPosition, in_side_scaled, out_side, avgChans, p)
 %MAKE_SCALE_PYRAMID
 %   computes a pyramid of re-scaled copies of the target (centered on TARGETPOSITION)
 %   and resizes them to OUT_SIDE. If crops exceed image boundaries they are padded with AVGCHANS.
@@ -16,7 +16,7 @@ function pyramid = make_scale_pyramid(im, targetPosition, in_side_scaled, out_si
     search_side = round(beta * max_target_side);
     [search_region, ~] = get_subwindow_tracking(im, targetPosition, [search_side search_side], [max_target_side max_target_side], avgChans);
     if p.subMean
-        search_region = bsxfun(@minus, search_region, reshape(stats.x.rgbMean, [1 1 3]));
+        search_region = bsxfun(@minus, search_region, reshape(p.stats.x.rgbMean, [1 1 3]));
     end
     assert(round(beta * min_target_side)==out_side);
 

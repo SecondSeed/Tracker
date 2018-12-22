@@ -1,5 +1,5 @@
 % -------------------------------------------------------------------------------------------------------------------------
-function [newTargetPosition, bestScale, responseMap] = tracker_eval2(net_x, s_x, scoreId, z_features, x_crops, targetPosition, window, p)
+function [newTargetPosition, bestScale, responseMap] = tracker_eval2(s_x, z_features, x_crops, targetPosition, p)
 %TRACKER_STEP
 %   runs a forward pass of the search-region branch of the pre-trained Fully-Convolutional Siamese,
 %   reusing the features of the exemplar z computed at the first frame.
@@ -7,8 +7,8 @@ function [newTargetPosition, bestScale, responseMap] = tracker_eval2(net_x, s_x,
 %   Luca Bertinetto, Jack Valmadre, Joao F. Henriques, 2016
 % -------------------------------------------------------------------------------------------------------------------------
     % forward pass, using the pyramid of scaled crops as a "batch"
-    net_x.eval({p.id_feat_z, z_features, 'instance', x_crops});
-    responseMaps = reshape(net_x.vars(scoreId).value, [p.scoreSize p.scoreSize p.numScale]);
+    p.net_x.eval({p.id_feat_z, z_features, 'instance', x_crops});
+    responseMaps = reshape(p.net_x.vars(p.scoreId).value, [p.scoreSize p.scoreSize p.numScale]);
     responseMapsUP = gpuArray(single(zeros(p.scoreSize*p.responseUp, p.scoreSize*p.responseUp, p.numScale)));
     % Choose the scale whose response map has the highest peak
     if p.numScale>1
@@ -39,13 +39,16 @@ function [newTargetPosition, bestScale, responseMap] = tracker_eval2(net_x, s_x,
         bestScale = 1;
     end
     
-    % make the response map to 0 - 1
-    responseMap = responseMap - min(responseMap(:));
-    responseMap = responseMap / sum(responseMap(:));
-    % apply windowing
-    responseMap = (1-p.wInfluence)*responseMap + p.wInfluence*window;
-    responseMap = responseMap - min(responseMap(:));
-    responseMap = responseMap / (max(responseMap(:)) - min(responseMap(:)));
+%     % make the response map to 0 - 1
+%     if p.average_response == 0
+%         p.average_response = mean(responseMap(:));
+%         responseMap = responseMap - min(responseMap(:));
+%         responseMap = responseMap / (max(responseMap(:)) - min(responseMap(:)));
+%     else
+%         responseMap = responseMap - min(responseMap(:));
+%         responseMap = responseMap / (max(responseMap(:)) - min(responseMap(:)));
+%         responseMap = responseMap / p.average_response
+%     end
     [r_max, c_max] = find(responseMap == max(responseMap(:)), 1);
     [r_max, c_max] = avoid_empty_position(r_max, c_max, p);
     p_corr = [r_max, c_max];
