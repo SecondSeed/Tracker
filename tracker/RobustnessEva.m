@@ -4,6 +4,11 @@ function Reliability = RobustnessEva(expert, num, frame, period, weight, expertN
    OverlapScore(period, expertNum) = 0;
    for i = 1 : expertNum 
       Overlap = calcRectInt( expert(num).rect_position(frame - period + 1:frame,:) , expert(i).rect_position(frame - period + 1:frame,:) );
+      for j = frame - period + 1 : frame
+          if expert(num).hold(j) == 0 | expert(i).hold(j) == 0
+              Overlap(j) = 0;
+          end
+      end
       OverlapScore(:,i) = exp(-(1 - Overlap).^2);    
    end
    % the average overlap
@@ -16,11 +21,7 @@ function Reliability = RobustnessEva(expert, num, frame, period, weight, expertN
    WeightAveOP = norm_factor*(weight*AveOP);
    WeightVarOP = norm_factor*(weight*VarOP);
    PairScore = WeightAveOP./(WeightVarOP+0.008); 
-   SmoothScore = expert(num).smoothScore(frame - period + 1:frame);
-   SelfScore = norm_factor*sum(SmoothScore.*weight);
-   % combine pair-evaluation and self-evaluation
-   yita = 0.10;  
-   Reliability = yita * PairScore + (1 - yita) * SelfScore;
+   Reliability = PairScore;
 
 end
 
