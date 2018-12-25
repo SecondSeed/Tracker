@@ -14,8 +14,8 @@ params.enableopticalflow = 1;
 params.showflow = 0;
 
 %% load video info
-videoname = 'Matrix'; 
-img_path = 'sequence/Matrix/img/';
+videoname = 'Basketball'; 
+img_path = 'sequence/Basketball/img/';
 base_path = 'sequence/';
 [img_files, pos, target_sz, video_path] = load_video_info(base_path, videoname);
 

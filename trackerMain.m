@@ -199,10 +199,12 @@ for frame = 1:num_frames
               end
               % expert robustness evaluation
               expert(i).RobScore = RobustnessEva(expert, i, frame, period, weight, expertNum);
-              IDensemble(i) = expert(i).RobScore;
           end
-          
-          
+          % 将鲁棒性分数归一化
+          expert = normRobust(expert, expertNum);
+          for i = 1 : expertNum
+              IDensemble(i) = 0.25 * expert(i).normRobScore + 0.25 * expert(i).flowscore + expert(i).normsimilarityScore * 0.15 + 0.35 * expert(i).normfsim;
+          end
           meanScore(frame) = sum(IDensemble)/expertNum;
           [~, ID] = sort(IDensemble, 'descend');
           pos = expert( ID(1) ).pos;
@@ -359,12 +361,12 @@ for frame = 1:num_frames
 %             im = insertShape(im, 'Rectangle', expert(4).rect_position(frame,:), 'LineWidth', 3, 'Color', 'magenta'); 
 %             im = insertShape(im, 'Rectangle', expert(5).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');  
 %             im = insertShape(im, 'Rectangle', expert(6).rect_position(frame,:), 'LineWidth', 3, 'Color', 'green');  
-            im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red'); 
-            im = insertShape(im, 'Rectangle', expert(8).rect_position(frame,:), 'LineWidth', 3, 'Color', 'yellow');
+%             im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red'); 
+%             im = insertShape(im, 'Rectangle', expert(8).rect_position(frame,:), 'LineWidth', 3, 'Color', 'yellow');
 %             im = insertShape(im, 'Rectangle', frect, 'LineWidth', 3, 'Color', 'blue'); 
             %%% final result
             %im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
-%            im = insertShape(im, 'Rectangle', Final_rect_position, 'LineWidth', 3, 'Color', 'red');
+           im = insertShape(im, 'Rectangle', Final_rect_position, 'LineWidth', 3, 'Color', 'red');
             %im = insertShape(im, flow, 'DecimationFactor', [5, 5], 'ScaleFactor', 10);
             hold off;
             imshow(im);

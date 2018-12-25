@@ -6,7 +6,7 @@ function Reliability = RobustnessEva(expert, num, frame, period, weight, expertN
       Overlap = calcRectInt( expert(num).rect_position(frame - period + 1:frame,:) , expert(i).rect_position(frame - period + 1:frame,:) );
       for j = frame - period + 1 : frame
           if expert(num).hold(j) == 0 | expert(i).hold(j) == 0
-              Overlap(j) = 0;
+              Overlap(j - frame + period) = 0;
           end
       end
       OverlapScore(:,i) = exp(-(1 - Overlap).^2);    
