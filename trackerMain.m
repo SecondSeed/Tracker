@@ -19,6 +19,13 @@ flowScore(1, expertNum) = 0;
 choosenSimExp = 0;
 output_rect_positions(num_frames, 4) = 0;
 Mode = 1;
+low_factor = 0.3;
+enableUpdate = 1;
+search_count = 0;
+searchthreshold = 2;
+lowthreshold = 5;
+meancount = 0;
+meanparam = 0.3;
 
 %saimese_window = make_window(saimese);
 saimese.stats = [];
@@ -89,123 +96,160 @@ for frame = 1:num_frames
         im = imread([p.img_path p.img_files{frame}]);
         t_imread = t_imread + toc(tic_imread);
         if Mode == 1
-        end
-        % extract patch of size bg_area and resize to norm_bg_area
-        im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
-        % color histogram (mask)
-        [likelihood_map] = getColourMap(im_patch_cf, bg_hist, fg_hist, p.n_bins, p.grayscale_sequence);
-        likelihood_map(isnan(likelihood_map)) = 0;
-        likelihood_map = imResample(likelihood_map, p.cf_response_size);
-        % likelihood_map normalization, and avoid too many zero values
-        likelihood_map = (likelihood_map + min(likelihood_map(:)))/(max(likelihood_map(:)) + min(likelihood_map(:)));
-        if (sum(likelihood_map(:))/prod(p.cf_response_size)<0.01), likelihood_map = 1; end
-        likelihood_map = max(likelihood_map, 0.1);
-        % apply color mask to sample(or hann_window)
-        hann_window =  hann_window_cosine .* likelihood_map;
-        % compute feature map
-        xt = getFeatureMap(im_patch_cf, p.cf_response_size, p.hog_cell_size);
-        % apply Hann window
-        xt_windowed = bsxfun(@times, hann_window, xt);
-        % compute FFT
-        xtf = fft2(xt_windowed);
-        % Correlation between filter and test patch gives the response
-        hf = bsxfun(@rdivide, hf_num, sum(hf_den, 3) + p.lambda);
-        response_cfilter = ensure_real(ifft2(sum( conj(hf) .* xtf, 3)));
-        % Crop square search region (in feature pixels) and scale up to match center likelihood resolution.
-        % Low-level feature (HOG) based DCF
-        response_cf = cropFilterResponse(response_cfilter, floor_odd(p.norm_delta_area / p.hog_cell_size));
-        responseHandLow = mexResize(response_cf, p.norm_delta_area,'auto');
-        % Extract deep features
-        xt_deep  = getDeepFeatureMap(im_patch_cf, hann_window, indLayers);
-        response_deep = cell(1,2);
-        for ii = 1 : length(indLayers)
-            xtf_deep{ii} = fft2(xt_deep{ii});
-            hf_deep = bsxfun(@rdivide, hf_num_deep{ii}, sum(hf_den_deep{ii}, 3) + p.lambda);
-            response_deep{ii} = ensure_real( ifft2(sum( conj(hf_deep) .* xtf_deep{ii}, 3))  );
-        end
-        % Middle-level feature (conv4-3) based DCF
-        responseDeepMiddle = cropFilterResponse(response_deep{2}, floor_odd(p.norm_delta_area / p.hog_cell_size));
-        responseDeepMiddle = mexResize(responseDeepMiddle, p.norm_delta_area,'auto');
-        % High-level feature (conv5-3) based DCF
-        responseDeepHigh = cropFilterResponse(response_deep{1}, floor_odd(p.norm_delta_area / p.hog_cell_size));
-        responseDeepHigh = mexResize(responseDeepHigh, p.norm_delta_area,'auto');
-        % Construct multiple experts
-        % the weights of High, Middle, Low features are [1, 0.5, 0.02]
-        response_cat = cat(3, responseHandLow, responseDeepMiddle, responseDeepHigh);
-        for i = 1: expertNum - 1
-            expert(i).response =  sum(bsxfun(@times, response_cat, experts_params(i, :, :)), 3);
-        end
-        
-        % run saimese
-        
-        
-        
-        
-        [fpos, fsz, fsim, response] = excuteMultiScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
-        % similarity with first frame
-        
-        first_response = max(response, [], 3);
-        % similarity expert
-        expert(expertNum).response = first_response;
-        
-        mfr = mean(first_response(:));
-        
-        center = (1 + p.norm_delta_area) / 2;
-        for i = 1:expertNum - 1
-            [row, col] = find(expert(i).response == max(expert(i).response(:)), 1);
-            expert(i).pos = pos + ([row, col] - center) / area_resize_factor;
-            expert(i).rect_position(frame,:) = [expert(i).pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
-            expert(i).center(frame,:) = [expert(i).rect_position(frame,1)+(expert(i).rect_position(frame,3)-1)/2 expert(i).rect_position(frame,2)+(expert(i).rect_position(frame,4)-1)/2];
-            % calculate expert similarity score
-            expert(i).fsim = calculateSimilarityScore(expert(i).pos, pos, first_response, s_x, saimese);
-        end
-        
-        expert(expertNum).pos = fpos;
-        expert(expertNum).rect_position(frame,:) = [expert(expertNum).pos([2,1]) - fsz([2,1])/2, fsz([2,1])];
-        expert(expertNum).center(frame,:) = [expert(expertNum).rect_position(frame,1)+(expert(expertNum).rect_position(frame,3)-1)/2 expert(expertNum).rect_position(frame,2)+(expert(expertNum).rect_position(frame,4)-1)/2];
-        expert(expertNum).fsim = fsim;
-        
-        %compute optical flow
-        if p.enableopticalflow == 1
-            optic_im = makeMask(im, pos, p.optical_area);
-            flow = estimateFlow(opticFlow, optic_im);
-        end
-        
-        % 使用 meanFirstSim 和 meanLastSim 来将相似性分数映射到 0 - 1 之间，
-        % 并对 expert 增加 hold 字段， 使相似性分数低于平均值的专家hold字段置false
-        expert = calculateRelativeSimilarity(expert, expertNum, meanFirstSim, mfr, frame);
-        if frame > period - 1
-            for i = 1:expertNum
-                % expert optical flow reliability
-                if p.enableopticalflow == 1
-                    expert(i).flowscore = calculateOpticalScore(flow, pos, target_sz, expert(i).rect_position(frame, :));
+            % extract patch of size bg_area and resize to norm_bg_area
+            im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
+            % color histogram (mask)
+            [likelihood_map] = getColourMap(im_patch_cf, bg_hist, fg_hist, p.n_bins, p.grayscale_sequence);
+            likelihood_map(isnan(likelihood_map)) = 0;
+            likelihood_map = imResample(likelihood_map, p.cf_response_size);
+            % likelihood_map normalization, and avoid too many zero values
+            likelihood_map = (likelihood_map + min(likelihood_map(:)))/(max(likelihood_map(:)) + min(likelihood_map(:)));
+            if (sum(likelihood_map(:))/prod(p.cf_response_size)<0.01), likelihood_map = 1; end
+            likelihood_map = max(likelihood_map, 0.1);
+            % apply color mask to sample(or hann_window)
+            hann_window =  hann_window_cosine .* likelihood_map;
+            % compute feature map
+            xt = getFeatureMap(im_patch_cf, p.cf_response_size, p.hog_cell_size);
+            % apply Hann window
+            xt_windowed = bsxfun(@times, hann_window, xt);
+            % compute FFT
+            xtf = fft2(xt_windowed);
+            % Correlation between filter and test patch gives the response
+            hf = bsxfun(@rdivide, hf_num, sum(hf_den, 3) + p.lambda);
+            response_cfilter = ensure_real(ifft2(sum( conj(hf) .* xtf, 3)));
+            % Crop square search region (in feature pixels) and scale up to match center likelihood resolution.
+            % Low-level feature (HOG) based DCF
+            response_cf = cropFilterResponse(response_cfilter, floor_odd(p.norm_delta_area / p.hog_cell_size));
+            responseHandLow = mexResize(response_cf, p.norm_delta_area,'auto');
+            % Extract deep features
+            xt_deep  = getDeepFeatureMap(im_patch_cf, hann_window, indLayers);
+            response_deep = cell(1,2);
+            for ii = 1 : length(indLayers)
+                xtf_deep{ii} = fft2(xt_deep{ii});
+                hf_deep = bsxfun(@rdivide, hf_num_deep{ii}, sum(hf_den_deep{ii}, 3) + p.lambda);
+                response_deep{ii} = ensure_real( ifft2(sum( conj(hf_deep) .* xtf_deep{ii}, 3))  );
+            end
+            % Middle-level feature (conv4-3) based DCF
+            responseDeepMiddle = cropFilterResponse(response_deep{2}, floor_odd(p.norm_delta_area / p.hog_cell_size));
+            responseDeepMiddle = mexResize(responseDeepMiddle, p.norm_delta_area,'auto');
+            % High-level feature (conv5-3) based DCF
+            responseDeepHigh = cropFilterResponse(response_deep{1}, floor_odd(p.norm_delta_area / p.hog_cell_size));
+            responseDeepHigh = mexResize(responseDeepHigh, p.norm_delta_area,'auto');
+            % Construct multiple experts
+            % the weights of High, Middle, Low features are [1, 0.5, 0.02]
+            response_cat = cat(3, responseHandLow, responseDeepMiddle, responseDeepHigh);
+            for i = 1: expertNum - 1
+                expert(i).response =  sum(bsxfun(@times, response_cat, experts_params(i, :, :)), 3);
+            end
+            
+            % run saimese
+            
+            
+            
+            
+            [fpos, fsz, fsim, response] = excuteMultiScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
+            if frame == 2
+                firstsim = fsim;
+            end
+            first_response = max(response, [], 3);
+            % similarity expert
+            expert(expertNum).response = first_response;
+            
+            mfr = mean(first_response(:));
+            
+            center = (1 + p.norm_delta_area) / 2;
+            for i = 1:expertNum - 1
+                [row, col] = find(expert(i).response == max(expert(i).response(:)), 1);
+                expert(i).pos = pos + ([row, col] - center) / area_resize_factor;
+                expert(i).rect_position(frame,:) = [expert(i).pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
+                expert(i).center(frame,:) = [expert(i).rect_position(frame,1)+(expert(i).rect_position(frame,3)-1)/2 expert(i).rect_position(frame,2)+(expert(i).rect_position(frame,4)-1)/2];
+                % calculate expert similarity score
+                expert(i).fsim = calculateSimilarityScore(expert(i).pos, pos, first_response, s_x, saimese);
+            end
+            
+            expert(expertNum).pos = fpos;
+            expert(expertNum).rect_position(frame,:) = [expert(expertNum).pos([2,1]) - fsz([2,1])/2, fsz([2,1])];
+            expert(expertNum).center(frame,:) = [expert(expertNum).rect_position(frame,1)+(expert(expertNum).rect_position(frame,3)-1)/2 expert(expertNum).rect_position(frame,2)+(expert(expertNum).rect_position(frame,4)-1)/2];
+            expert(expertNum).fsim = fsim;
+            
+            %compute optical flow
+            if p.enableopticalflow == 1
+                optic_im = makeMask(im, pos, p.optical_area);
+                flow = estimateFlow(opticFlow, optic_im);
+            end
+            
+            % 使用 meanFirstSim 和 meanLastSim 来将相似性分数映射到 0 - 1 之间，
+            % 并对 expert 增加 hold 字段， 使相似性分数低于平均值的专家hold字段置false
+            expert = calculateRelativeSimilarity(expert, expertNum, meanFirstSim, mfr, frame);
+            if frame > period - 1
+                for i = 1:expertNum
+                    % expert optical flow reliability
+                    if p.enableopticalflow == 1
+                        expert(i).flowscore = calculateOpticalScore(flow, pos, target_sz, expert(i).rect_position(frame, :));
+                    end
+                    % expert robustness evaluation
+                    expert(i).RobScore = RobustnessEva(expert, i, frame, period, weight, expertNum);
                 end
-                % expert robustness evaluation
-                expert(i).RobScore = RobustnessEva(expert, i, frame, period, weight, expertNum);
-            end
-            % 将鲁棒性分数归一化
-            expert = normRobust(expert, expertNum);
-            for i = 1 : expertNum
-                IDensemble(i) = 0.25 * expert(i).normRobScore + 0.25 * expert(i).flowscore + 0.5 * expert(i).normfsim;
-            end
-            meanScore(frame) = sum(IDensemble)/expertNum;
-            [~, ID] = sort(IDensemble, 'descend');
-            pos = expert( ID(1) ).pos;
-            Final_rect_position = expert( ID(1) ).rect_position(frame,:);
-            allFirstSim = allFirstSim + expert( ID(1) ).fsim;
-            if ID(1) == expertNum
-                choosenSimExp = 1;
+                % 将鲁棒性分数归一化
+                expert = normRobust(expert, expertNum);
+                for i = 1 : expertNum
+                    IDensemble(i) = 0.6 * expert(i).normRobScore + 0.25 * expert(i).flowscore + 0.15 * expert(i).normfsim;
+                end
+                meanScore(frame) = sum(IDensemble)/expertNum;
+                [~, ID] = sort(IDensemble, 'descend');
+                pos = expert( ID(1) ).pos;
+                Final_rect_position = expert( ID(1) ).rect_position(frame,:);
+                if ID(1) == expertNum
+                    choosenSimExp = 1;
+                else
+                    choosenSimExp = 0;
+                end
             else
-                choosenSimExp = 0;
+                for i = 1:expertNum, expert(i).RobScore(frame) = 1; end
+                pos = expert(7).pos;
+                Final_rect_position = expert(7).rect_position(frame,:);
+            end
+            % 最大的相似度都很低， 可能已经丢失目标了
+            fsim
+            meanFirstSim
+            show = meanFirstSim * low_factor
+            if fsim < low_factor * meanFirstSim & low_count >= lowthreshold
+                % 大尺度搜索
+                choosenSimExp = 1;
+                low_count = 0;
+                Mode = 0;
+                enableUpdate = 0;
+                [fpos, fsz, fsim] = excuteLargeScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
+                [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, fsim, meancount);
+                Final_rect_position = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
+            else
+                
+                if fsim < low_factor * meanFirstSim
+                    low_count = low_count + 1;
+                else
+                    low_count = 0;
+                end
+                % 按照多专家的方式更新目标相似度和
+                if frame > period - 1
+                    [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, expert( ID(1) ).fsim, meancount);
+                else
+                    [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, expert(7).fsim, meancount);
+                end
             end
         else
-            for i = 1:expertNum, expert(i).RobScore(frame) = 1; end
-            pos = expert(7).pos;
-            Final_rect_position = expert(7).rect_position(frame,:);
-            allFirstSim = allFirstSim + expert(7).fsim;
+            % 执行大尺度搜索
+            choosenSimExp = 1;
+            low_count = 0;
+            [fpos, fsz, fsim] = excuteLargeScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
+            Final_rect_position = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
+            search_count = search_count + 1;
+            [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, fsim, meancount);
+            if search_count >= searchthreshold | fsim > low_factor * meanFirstSim
+                Mode = 1;
+                enableUpdate = 1;
+            end
         end
-        
-        meanFirstSim = allFirstSim / (frame  - 1);
+        meanFirstSim = allFirstSim / meancount;
         
         %% ADAPTIVE UPDATE
         Score1 = calculatePSR(response_cfilter);
@@ -242,7 +286,7 @@ for frame = 1:num_frames
                 scale_factor = min_scale_factor;
             elseif scale_factor > max_scale_factor
                 scale_factor = max_scale_factor;
-            end           
+            end
         else
             scale_factor = fsz / base_target_sz;
         end
@@ -261,25 +305,27 @@ for frame = 1:num_frames
         area_resize_factor = sqrt(p.fixed_area/prod(bg_area));
     end
     
-    % extract patch of size bg_area and resize to norm_bg_area
-    im_patch_bg = getSubwindow(im, pos, p.norm_bg_area, bg_area);
-    % compute feature map, of cf_response_size
-    xt = getFeatureMap(im_patch_bg, p.cf_response_size, p.hog_cell_size);
-    % apply Hann window, bsxfun(@times, a, b) 矩阵乘法
-    xt = bsxfun(@times, hann_window_cosine, xt);
-    % compute FFT
-    xtf = fft2(xt);
-    % FILTER UPDATE
-    % Compute expectations over circular shifts, therefore divide by number of pixels.
-    % conj复共轭
-    new_hf_num = bsxfun(@times, conj(yf), xtf) / prod(p.cf_response_size);
-    new_hf_den = (conj(xtf) .* xtf) / prod(p.cf_response_size);
-    
-    xt_deep  = getDeepFeatureMap(im_patch_bg, hann_window_cosine, indLayers);
-    for  ii = 1 : numLayers
-        xtf_deep{ii} = fft2(xt_deep{ii});
-        new_hf_num_deep{ii} = bsxfun(@times, conj(yf), xtf_deep{ii}) / prod(p.cf_response_size);
-        new_hf_den_deep{ii} = (conj(xtf_deep{ii}) .* xtf_deep{ii}) / prod(p.cf_response_size);
+    if enableUpdate == 1
+        % extract patch of size bg_area and resize to norm_bg_area
+        im_patch_bg = getSubwindow(im, pos, p.norm_bg_area, bg_area);
+        % compute feature map, of cf_response_size
+        xt = getFeatureMap(im_patch_bg, p.cf_response_size, p.hog_cell_size);
+        % apply Hann window, bsxfun(@times, a, b) 矩阵乘法
+        xt = bsxfun(@times, hann_window_cosine, xt);
+        % compute FFT
+        xtf = fft2(xt);
+        % FILTER UPDATE
+        % Compute expectations over circular shifts, therefore divide by number of pixels.
+        % conj复共轭
+        new_hf_num = bsxfun(@times, conj(yf), xtf) / prod(p.cf_response_size);
+        new_hf_den = (conj(xtf) .* xtf) / prod(p.cf_response_size);
+        
+        xt_deep  = getDeepFeatureMap(im_patch_bg, hann_window_cosine, indLayers);
+        for  ii = 1 : numLayers
+            xtf_deep{ii} = fft2(xt_deep{ii});
+            new_hf_num_deep{ii} = bsxfun(@times, conj(yf), xtf_deep{ii}) / prod(p.cf_response_size);
+            new_hf_den_deep{ii} = (conj(xtf_deep{ii}) .* xtf_deep{ii}) / prod(p.cf_response_size);
+        end
     end
     
     if frame == 1
@@ -313,16 +359,20 @@ for frame = 1:num_frames
     end
     
     %% SCALE UPDATE
-    im_patch_scale = getScaleSubwindow(im, pos, base_target_sz, scale_factor*scale_factors, scale_window, scale_model_sz, p.hog_scale_cell_size);
-    xsf = fft(im_patch_scale,[],2);
-    new_sf_num = bsxfun(@times, ysf, conj(xsf));
-    new_sf_den = sum(xsf .* conj(xsf), 1);
+    if enableUpdate == 1 | frame == 1
+        im_patch_scale = getScaleSubwindow(im, pos, base_target_sz, scale_factor*scale_factors, scale_window, scale_model_sz, p.hog_scale_cell_size);
+        xsf = fft(im_patch_scale,[],2);
+        new_sf_num = bsxfun(@times, ysf, conj(xsf));
+        new_sf_den = sum(xsf .* conj(xsf), 1);
+    end
     if frame == 1,
         sf_den = new_sf_den;
         sf_num = new_sf_num;
     else
-        sf_den = (1 - p.learning_rate_scale) * sf_den + p.learning_rate_scale * new_sf_den;
-        sf_num = (1 - p.learning_rate_scale) * sf_num + p.learning_rate_scale * new_sf_num;
+        if enableUpdate == 1
+            sf_den = (1 - p.learning_rate_scale) * sf_den + p.learning_rate_scale * new_sf_den;
+            sf_num = (1 - p.learning_rate_scale) * sf_num + p.learning_rate_scale * new_sf_num;
+        end
     end
     % update bbox position
     if (frame == 1)
@@ -331,8 +381,10 @@ for frame = 1:num_frames
             expert(i).rect_position(frame,:) = [pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
             expert(i).RobScore(frame) = 1;
             expert(i).hold(frame,:) = 1;
+            expert(i).response = [];
         end
     end
+    Final_rect_position
     output_rect_positions(frame,:) = Final_rect_position;
     
     %     srect = [saipos([2,1]) - saisz([2,1])/2, saisz([2,1])];

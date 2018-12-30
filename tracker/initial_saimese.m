@@ -1,8 +1,8 @@
 function saimese = initial_saimese()
     saimese.gpus = 1;
 %     remove Scale for MCCT
-    saimese.numScale = 5;
-    saimese.scaleStep = 1.0275;
+    saimese.numScale = 9;
+    saimese.scaleStep = 1.0175;
     saimese.scalePenalty = 0.9745;
     saimese.scaleLR = 0.59; % damping factor for scale update
 

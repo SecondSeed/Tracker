@@ -10,7 +10,7 @@ for i = 1 : expertNum
 end
 
 for i = 1 : expertNum
-    if expert(i).normfsim < 0
+    if expert(i).normfsim < 0.1
         expert(i).hold(frame,:) = 0;
     end
     if expert(i).normfsim > 1
