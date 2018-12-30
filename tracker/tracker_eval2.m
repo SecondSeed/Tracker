@@ -39,16 +39,6 @@ function [newTargetPosition, bestScale, responseMap] = tracker_eval2(s_x, z_feat
         bestScale = 1;
     end
     
-%     % make the response map to 0 - 1
-%     if p.average_response == 0
-%         p.average_response = mean(responseMap(:));
-%         responseMap = responseMap - min(responseMap(:));
-%         responseMap = responseMap / (max(responseMap(:)) - min(responseMap(:)));
-%     else
-%         responseMap = responseMap - min(responseMap(:));
-%         responseMap = responseMap / (max(responseMap(:)) - min(responseMap(:)));
-%         responseMap = responseMap / p.average_response
-%     end
     [r_max, c_max] = find(responseMap == max(responseMap(:)), 1);
     [r_max, c_max] = avoid_empty_position(r_max, c_max, p);
     p_corr = [r_max, c_max];

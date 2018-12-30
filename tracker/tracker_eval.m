@@ -1,5 +1,5 @@
 % -------------------------------------------------------------------------------------------------------------------------
-function [newTargetPosition, bestScale] = tracker_eval(net_x, s_x, scoreId, z_features, x_crops, targetPosition, window, p)
+function [newTargetPosition, bestScale, response] = tracker_eval(net_x, s_x, scoreId, z_features, x_crops, targetPosition, window, p)
 %TRACKER_STEP
 %   runs a forward pass of the search-region branch of the pre-trained Fully-Convolutional Siamese,
 %   reusing the features of the exemplar z computed at the first frame.
@@ -36,6 +36,7 @@ function [newTargetPosition, bestScale] = tracker_eval(net_x, s_x, scoreId, z_fe
         responseMap = responseMapsUP;
         bestScale = 1;
     end
+    response = gather(responseMapsUP);
     % make the response map sum to 1
     responseMap = responseMap - min(responseMap(:));
     responseMap = responseMap / sum(responseMap(:));
