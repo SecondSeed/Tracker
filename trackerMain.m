@@ -26,6 +26,7 @@ searchthreshold = 2;
 lowthreshold = 5;
 meancount = 0;
 meanparam = 0.3;
+bestcfexp = 7;
 
 %saimese_window = make_window(saimese);
 saimese.stats = [];
@@ -165,12 +166,19 @@ for frame = 1:num_frames
                 expert(i).center(frame,:) = [expert(i).rect_position(frame,1)+(expert(i).rect_position(frame,3)-1)/2 expert(i).rect_position(frame,2)+(expert(i).rect_position(frame,4)-1)/2];
                 % calculate expert similarity score
                 expert(i).fsim = calculateSimilarityScore(expert(i).pos, pos, first_response, s_x, saimese);
+                
+                expert(i).smooth(frame) = sqrt( sum((expert(i).center(frame,:)-expert(i).center(frame-1,:)).^2) );
+                % smoothness between two frames
+                expert(i).smoothScore(frame) = exp(- (expert(i).smooth(frame)).^2/ (2 * p.avg_dim.^2) );
             end
             
             expert(expertNum).pos = fpos;
             expert(expertNum).rect_position(frame,:) = [expert(expertNum).pos([2,1]) - fsz([2,1])/2, fsz([2,1])];
             expert(expertNum).center(frame,:) = [expert(expertNum).rect_position(frame,1)+(expert(expertNum).rect_position(frame,3)-1)/2 expert(expertNum).rect_position(frame,2)+(expert(expertNum).rect_position(frame,4)-1)/2];
             expert(expertNum).fsim = fsim;
+            expert(expertNum).smooth(frame) = sqrt( sum((expert(expertNum).center(frame,:)-expert(expertNum).center(frame-1,:)).^2) );
+            % smoothness between two frames
+            expert(expertNum).smoothScore(frame) = exp(- (expert(expertNum).smooth(frame)).^2/ (2 * p.avg_dim.^2) );
             
             %compute optical flow
             if p.enableopticalflow == 1
@@ -193,7 +201,7 @@ for frame = 1:num_frames
                 % 将鲁棒性分数归一化
                 expert = normRobust(expert, expertNum);
                 for i = 1 : expertNum
-                    IDensemble(i) = 0.6 * expert(i).normRobScore + 0.25 * expert(i).flowscore + 0.15 * expert(i).normfsim;
+                    IDensemble(i) = 0.85 * expert(i).normRobScore + 0.1 * expert(i).flowscore + 0.05 * expert(i).normfsim;
                 end
                 meanScore(frame) = sum(IDensemble)/expertNum;
                 [~, ID] = sort(IDensemble, 'descend');
@@ -201,18 +209,21 @@ for frame = 1:num_frames
                 Final_rect_position = expert( ID(1) ).rect_position(frame,:);
                 if ID(1) == expertNum
                     choosenSimExp = 1;
+                    bestcfexp = ID(2);
                 else
                     choosenSimExp = 0;
+                    bestcfexp = ID(1);
                 end
             else
                 for i = 1:expertNum, expert(i).RobScore(frame) = 1; end
                 pos = expert(7).pos;
                 Final_rect_position = expert(7).rect_position(frame,:);
+                bestcfexp = 7;
             end
             % 最大的相似度都很低， 可能已经丢失目标了
-            fsim
-            meanFirstSim
-            show = meanFirstSim * low_factor
+%             fsim
+%             meanFirstSim
+%             show = meanFirstSim * low_factor
             if fsim < low_factor * meanFirstSim & low_count >= lowthreshold
                 % 大尺度搜索
                 choosenSimExp = 1;
@@ -250,7 +261,7 @@ for frame = 1:num_frames
             end
         end
         meanFirstSim = allFirstSim / meancount;
-        
+        simrect = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
         %% ADAPTIVE UPDATE
         Score1 = calculatePSR(response_cfilter);
         Score2 = calculatePSR(response_deep{1});
@@ -365,7 +376,7 @@ for frame = 1:num_frames
         new_sf_num = bsxfun(@times, ysf, conj(xsf));
         new_sf_den = sum(xsf .* conj(xsf), 1);
     end
-    if frame == 1,
+    if frame == 1
         sf_den = new_sf_den;
         sf_num = new_sf_num;
     else
@@ -383,8 +394,8 @@ for frame = 1:num_frames
             expert(i).hold(frame,:) = 1;
             expert(i).response = [];
         end
+        simrect = [pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
     end
-    Final_rect_position
     output_rect_positions(frame,:) = Final_rect_position;
     
     %     srect = [saipos([2,1]) - saisz([2,1])/2, saisz([2,1])];
@@ -394,26 +405,30 @@ for frame = 1:num_frames
     if p.visualization == 1
         if isToolboxAvailable('Computer Vision System Toolbox')
             %%% multi-expert result
-            %             im = insertShape(im, 'Rectangle', expert(1).rect_position(frame,:), 'LineWidth', 3, 'Color', 'yellow');
-            %             im = insertShape(im, 'Rectangle', expert(2).rect_position(frame,:), 'LineWidth', 3, 'Color', 'black');
-            %             im = insertShape(im, 'Rectangle', expert(3).rect_position(frame,:), 'LineWidth', 3, 'Color', 'blue');
-            %             im = insertShape(im, 'Rectangle', expert(4).rect_position(frame,:), 'LineWidth', 3, 'Color', 'magenta');
-            %             im = insertShape(im, 'Rectangle', expert(5).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');
-            %             im = insertShape(im, 'Rectangle', expert(6).rect_position(frame,:), 'LineWidth', 3, 'Color', 'green');
-            %             im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red');
-            %             im = insertShape(im, 'Rectangle', expert(8).rect_position(frame,:), 'LineWidth', 3, 'Color', 'yellow');
+%                         im = insertShape(im, 'Rectangle', expert(1).rect_position(frame,:), 'LineWidth', 3, 'Color', 'yellow');
+%                         im = insertShape(im, 'Rectangle', expert(2).rect_position(frame,:), 'LineWidth', 3, 'Color', 'black');
+%                         im = insertShape(im, 'Rectangle', expert(3).rect_position(frame,:), 'LineWidth', 3, 'Color', 'blue');
+%                         im = insertShape(im, 'Rectangle', expert(4).rect_position(frame,:), 'LineWidth', 3, 'Color', 'magenta');
+%                         im = insertShape(im, 'Rectangle', expert(5).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');
+                        im = insertShape(im, 'Rectangle', simrect, 'LineWidth', 3, 'Color', 'blue');
+%                         im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red');
+            im = insertShape(im, 'Rectangle', expert(bestcfexp).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');
+
             %             im = insertShape(im, 'Rectangle', frect, 'LineWidth', 3, 'Color', 'blue');
             %%% final result
             %im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
             im = insertShape(im, 'Rectangle', Final_rect_position, 'LineWidth', 3, 'Color', 'red');
             %im = insertShape(im, flow, 'DecimationFactor', [5, 5], 'ScaleFactor', 10);
-            hold off;
-            imshow(im);
-            if p.showflow == 1
-                hold on;
-                plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);
-            end
-            drawnow
+%             hold off;
+%             imshow(im);
+%             hold on;
+%             if p.showflow == 1
+%                 plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);
+%             end
+%             drawnow
+            % Display the annotated video frame using the video player object.
+            step(p.videoPlayer, im);
+            Final_rect_position
             % Display the annotated video frame using the video player object.
             %step(p.videoPlayer, im);
             %plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);

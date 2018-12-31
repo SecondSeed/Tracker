@@ -21,7 +21,11 @@ function Reliability = RobustnessEva(expert, num, frame, period, weight, expertN
    WeightAveOP = norm_factor*(weight*AveOP);
    WeightVarOP = norm_factor*(weight*VarOP);
    PairScore = WeightAveOP./(WeightVarOP+0.008); 
-   Reliability = PairScore;
+   SmoothScore = expert(num).smoothScore(frame - period + 1:frame);
+   SelfScore = norm_factor*sum(SmoothScore.*weight);
+   % combine pair-evaluation and self-evaluation
+   yita = 0.10;  
+   Reliability = yita * PairScore + (1 - yita) * SelfScore;
 
 end
 
