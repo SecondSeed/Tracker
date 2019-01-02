@@ -13,11 +13,7 @@ params.visualization = 1;                  % show output bbox on frame
 params.enableopticalflow = 1;
 params.showflow = 0;
 
-%% load video info
-videoname = 'Soccer'; 
-img_path = 'sequence/Soccer/img/';
-base_path = 'sequence/';
-[img_files, pos, target_sz, video_path] = load_video_info(base_path, videoname);
+
 
 %% DCF related 
 params.hog_cell_size = 4;
@@ -41,8 +37,13 @@ params.scale_model_factor = 1.0;
 params.scale_step = 1.03;
 params.scale_model_max_area = 32*16;
 
+%% load all sequence
+base_path = 'sequence/';
+[videonames, img_paths] = load_all_sequence(base_path);
+for i = 55 : size(videonames, 2)
+[img_files, pos, target_sz, video_path] = load_video_info(base_path, videonames(i).str);
 %% start trackerMain.m
-im = imread([img_path img_files{1}]);
+im = imread([img_paths(i).str img_files{1}]);
 % is a grayscale sequence ?
 if(size(im,3)==1)
     params.grayscale_sequence = true;
@@ -51,15 +52,20 @@ if(size(im,3)==3)
     params.grayscale_sequence = false;
 end
 params.img_files = img_files;
-params.img_path = img_path;
+params.img_path = img_paths(i).str;
 % init_pos is the centre of the initial bounding box
 params.init_pos = pos;
 params.target_sz = target_sz;
 [params, bg_area, fg_area, area_resize_factor] = initializeAllAreas(im, params);
-if params.visualization
-    params.videoPlayer = vision.VideoPlayer('Position', [100 100 [size(im,2), size(im,1)]+30]);
-end
+% if params.visualization
+%     params.videoPlayer = vision.VideoPlayer('Position', [100 100 [size(im,2), size(im,1)]+30]);
+% end
 % ³õÊ¼»¯ÍøÂç
 saimese = initial_saimese();
+initial_net();
 % start the actual tracking
-trackerMain(params, im, bg_area, fg_area, area_resize_factor, saimese);
+result = trackerMain(params, im, bg_area, fg_area, area_resize_factor, saimese);
+res = result.res;
+result_path = ['res/' videonames(i).str '.mat'];
+save(result_path, 'res');
+end

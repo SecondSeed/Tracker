@@ -27,6 +27,7 @@ lowthreshold = 5;
 meancount = 0;
 meanparam = 0.3;
 bestcfexp = 7;
+evaluate_count = 0;
 
 %saimese_window = make_window(saimese);
 saimese.stats = [];
@@ -179,7 +180,7 @@ for frame = 1:num_frames
             expert(expertNum).smooth(frame) = sqrt( sum((expert(expertNum).center(frame,:)-expert(expertNum).center(frame-1,:)).^2) );
             % smoothness between two frames
             expert(expertNum).smoothScore(frame) = exp(- (expert(expertNum).smooth(frame)).^2/ (2 * p.avg_dim.^2) );
-            
+
             %compute optical flow
             if p.enableopticalflow == 1
                 optic_im = makeMask(im, pos, p.optical_area);
@@ -189,7 +190,8 @@ for frame = 1:num_frames
             % 使用 meanFirstSim 和 meanLastSim 来将相似性分数映射到 0 - 1 之间，
             % 并对 expert 增加 hold 字段， 使相似性分数低于平均值的专家hold字段置false
             expert = calculateRelativeSimilarity(expert, expertNum, meanFirstSim, mfr, frame);
-            if frame > period - 1
+            evaluate_count = evaluate_count + 1;
+            if evaluate_count > period - 1
                 for i = 1:expertNum
                     % expert optical flow reliability
                     if p.enableopticalflow == 1
@@ -233,6 +235,12 @@ for frame = 1:num_frames
                 [fpos, fsz, fsim] = excuteLargeScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
                 [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, fsim, meancount);
                 Final_rect_position = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
+                search_count = search_count + 1;
+                if search_count >= searchthreshold | fsim > low_factor * meanFirstSim
+                    Mode = 1;
+                    enableUpdate = 1;
+                    search_count = 0;
+                end
             else
                 
                 if fsim < low_factor * meanFirstSim
@@ -241,7 +249,7 @@ for frame = 1:num_frames
                     low_count = 0;
                 end
                 % 按照多专家的方式更新目标相似度和
-                if frame > period - 1
+                if evaluate_count > period - 1
                     [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, expert( ID(1) ).fsim, meancount);
                 else
                     [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, expert(7).fsim, meancount);
@@ -251,13 +259,16 @@ for frame = 1:num_frames
             % 执行大尺度搜索
             choosenSimExp = 1;
             low_count = 0;
+            evaluate_count = 0;
             [fpos, fsz, fsim] = excuteLargeScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
             Final_rect_position = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
+                       
             search_count = search_count + 1;
             [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, fsim, meancount);
             if search_count >= searchthreshold | fsim > low_factor * meanFirstSim
                 Mode = 1;
                 enableUpdate = 1;
+                search_count = 0;
             end
         end
         meanFirstSim = allFirstSim / meancount;
@@ -268,7 +279,7 @@ for frame = 1:num_frames
         Score3 = calculatePSR(response_deep{2});
         PSRScore(frame) = (Score1 + Score2 + Score3)/3;
         
-        if frame > period - 1
+        if evaluate_count > period - 1
             FinalScore = meanScore(frame)*PSRScore(frame);
             AveScore = sum(meanScore(period:frame).*PSRScore(period:frame))/(frame - period + 1);
             threshold =  update_thres * AveScore;
@@ -410,25 +421,26 @@ for frame = 1:num_frames
 %                         im = insertShape(im, 'Rectangle', expert(3).rect_position(frame,:), 'LineWidth', 3, 'Color', 'blue');
 %                         im = insertShape(im, 'Rectangle', expert(4).rect_position(frame,:), 'LineWidth', 3, 'Color', 'magenta');
 %                         im = insertShape(im, 'Rectangle', expert(5).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');
-                        im = insertShape(im, 'Rectangle', simrect, 'LineWidth', 3, 'Color', 'blue');
+            im = insertShape(im, 'Rectangle', simrect, 'LineWidth', 3, 'Color', 'blue');
 %                         im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red');
+            if evaluate_count ~= 0
             im = insertShape(im, 'Rectangle', expert(bestcfexp).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');
+            end
 
             %             im = insertShape(im, 'Rectangle', frect, 'LineWidth', 3, 'Color', 'blue');
             %%% final result
             %im_patch_cf = getSubwindow(im, pos, p.norm_bg_area, bg_area);
             im = insertShape(im, 'Rectangle', Final_rect_position, 'LineWidth', 3, 'Color', 'red');
             %im = insertShape(im, flow, 'DecimationFactor', [5, 5], 'ScaleFactor', 10);
-%             hold off;
-%             imshow(im);
-%             hold on;
-%             if p.showflow == 1
-%                 plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);
-%             end
-%             drawnow
+            hold off;
+            imshow(im);
+            hold on;
+            if p.showflow == 1
+                plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);
+            end
+            drawnow
             % Display the annotated video frame using the video player object.
-            step(p.videoPlayer, im);
-            Final_rect_position
+%            step(p.videoPlayer, im);
             % Display the annotated video frame using the video player object.
             %step(p.videoPlayer, im);
             %plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);
