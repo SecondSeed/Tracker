@@ -59,7 +59,7 @@ function [img_files, pos, target_sz, ground_truth, video_path] = load_video_info
 	
 	%for these sequences, we must limit ourselves to a range of frames.
 	%for all others, we just load all png/jpg files in the folder.
-	frames = {'David', 1, 471;
+	frames = {'David', 300, 770;
 			  'Football1', 1, 74;
 			  'Freeman3', 1, 460;
 			  'Freeman4', 1, 283;

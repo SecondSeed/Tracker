@@ -2,17 +2,24 @@ function [params, bg_area, fg_area, area_resize_factor] = initializeAllAreas(im,
      im_sz = size(im);
     % For objects with large height and width and accounting for at least 10 percent of the whole image,
     % we only search 2x height and width
-    if(prod(params.target_sz)/prod(im_sz(1:2)) > 0.05)     % Large target. 
-        params.padding = 1;  
+    if(prod(params.target_sz)/prod(im_sz(1:2)) > 0.05)     % Large target.  From HCF
+        params.padding = 1;   
+        params.optical_padding = 0.64;
     else
-        params.padding = 1.5;                              % Normal target.
+        params.padding = 1.8;                              % Normal target.
+        params.optical_padding = 1.2;
     end
 	% we want a regular frame surrounding the object
 	params.avg_dim = sum(params.target_sz)/2;
 	% size from which we extract features
 	bg_area = round(params.target_sz + params.avg_dim * params.padding);
+    
+    % size for which we compute optical flow
+    params.optical_area = round(params.target_sz + params.avg_dim * params.optical_padding);
+    
 	% pick a "safe" region smaller than bbox to avoid mislabeling
 	fg_area = round(params.target_sz - params.avg_dim * params.inner_padding);
+    
 	% saturate to image size
 	if(bg_area(2)>size(im,2)), bg_area(2)=size(im,2)-1; end
 	if(bg_area(1)>size(im,1)), bg_area(1)=size(im,1)-1; end

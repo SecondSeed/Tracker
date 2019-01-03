@@ -12,20 +12,21 @@ expertNum = p.expertNum;
 num_frames = numel(p.img_files);
 meanScore(1, num_frames) = 0;
 PSRScore(1, num_frames) = 0;
+IDensemble(1, expertNum) = 0;
+output_rect_positions(num_frames, 4) = 0;
+
 allFirstSim = 0;
 meanFirstSim = 0;
-IDensemble(1, expertNum) = 0;
-choosenSimExp = 0;
-output_rect_positions(num_frames, 4) = 0;
 Mode = 1;
-low_factor = 0.3;
+low_factor = 0.15;
 search_count = 0;
-searchthreshold = 2;
-lowthreshold = 5;
+searchthreshold = 3;
+lowthreshold = 3;
 low_count = 0;
 meancount = 0;
-meanparam = 0.3;
+meanparam = 0.5;
 evaluate_count = 0;
+choosenSimExp = 0;
 
 %saimese_window = make_window(saimese);
 saimese.stats = [];
@@ -37,7 +38,7 @@ experts_params = ones(expertNum, 1, 3);
 experts_params(:, :, :) = [[1, 0, 0]; [0, 1, 0]; [0, 0, 1]; [0.33, 0.67, 0];...
     [0.33, 0, 0.67]; [0, 0.33, 0.67]; [0.013, 0.33, 0.657]];
 
-score_param = [0.75, 0 ,0.25];
+score_param = [0.75, 0.1 ,0.15];
 
 
 % patch of the target + padding
@@ -144,10 +145,6 @@ for frame = 1:num_frames
             end
             
             % run saimese
-            
-            
-            
-            
             [fpos, fsz, fsim, response] = excuteMultiScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
             if frame == 2
                 firstsim = fsim;
@@ -217,7 +214,7 @@ for frame = 1:num_frames
 %             fsim
 %             meanFirstSim
 %             show = meanFirstSim * low_factor
-            if max_sim < low_factor * meanFirstSim && low_count >= lowthreshold
+            if fsim < low_factor * meanFirstSim && low_count >= lowthreshold
                 % ´ó³ß¶ÈËÑË÷
                 choosenSimExp = 1;
                 low_count = 0;
@@ -227,9 +224,8 @@ for frame = 1:num_frames
                 [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, fsim, meancount);
                 Final_rect_position = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
                 search_count = search_count + 1;
-                if search_count >= searchthreshold || max_sim > low_factor * meanFirstSim
+                if search_count >= searchthreshold || fsim > low_factor * meanFirstSim
                     Mode = 1;
-
                     search_count = 0;
                 end
             else
@@ -256,9 +252,8 @@ for frame = 1:num_frames
                        
             search_count = search_count + 1;
             [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, fsim, meancount);
-            if search_count >= searchthreshold || max_sim > low_factor * meanFirstSim
+            if search_count >= searchthreshold || fsim > low_factor * meanFirstSim
                 Mode = 1;
-
                 search_count = 0;
             end
         end
@@ -268,7 +263,6 @@ for frame = 1:num_frames
         Score2 = calculatePSR(response_deep{1});
         Score3 = calculatePSR(response_deep{2});
         PSRScore(frame) = (Score1 + Score2 + Score3)/3;
-        
         if evaluate_count > period - 1
             FinalScore = meanScore(frame)*PSRScore(frame);
             AveScore = sum(meanScore(period:frame).*PSRScore(period:frame))/(frame - period + 1);
@@ -301,6 +295,11 @@ for frame = 1:num_frames
             end
         else
             scale_factor = fsz / base_target_sz;
+            if scale_factor < min_scale_factor
+                scale_factor = min_scale_factor;
+            elseif scale_factor > max_scale_factor
+                scale_factor = max_scale_factor;
+            end
         end
         
         % use new scale to update bboxes for target, filter, bg and fg models
@@ -357,30 +356,32 @@ for frame = 1:num_frames
         end
     else
         % subsequent frames, update the model by linear interpolation
-        hf_den = (1 - learning_rate_cf) * hf_den + learning_rate_cf * new_hf_den;
-        hf_num = (1 - learning_rate_cf) * hf_num + learning_rate_cf * new_hf_num;
-        for ii = 1 : numLayers
-            hf_den_deep{ii} = (1 - learning_rate_cf) * hf_den_deep{ii} + learning_rate_cf * new_hf_den_deep{ii};
-            hf_num_deep{ii} = (1 - learning_rate_cf) * hf_num_deep{ii} + learning_rate_cf * new_hf_num_deep{ii};
+        if choosenSimExp == 0
+            hf_den = (1 - learning_rate_cf) * hf_den + learning_rate_cf * new_hf_den;
+            hf_num = (1 - learning_rate_cf) * hf_num + learning_rate_cf * new_hf_num;
+            for ii = 1 : numLayers
+                hf_den_deep{ii} = (1 - learning_rate_cf) * hf_den_deep{ii} + learning_rate_cf * new_hf_den_deep{ii};
+                hf_num_deep{ii} = (1 - learning_rate_cf) * hf_num_deep{ii} + learning_rate_cf * new_hf_num_deep{ii};
+            end
+            % BG/FG MODEL UPDATE   patch of the target + padding
+            im_patch_color = getSubwindow(im, pos, p.norm_bg_area, bg_area*(1-p.inner_padding));
+            [bg_hist, fg_hist] = updateHistModel(new_pwp_model, im_patch_color, bg_area, fg_area, target_sz, p.norm_bg_area, p.n_bins, p.grayscale_sequence, bg_hist, fg_hist, learning_rate_pwp);
         end
-        % BG/FG MODEL UPDATE   patch of the target + padding
-        im_patch_color = getSubwindow(im, pos, p.norm_bg_area, bg_area*(1-p.inner_padding));
-        [bg_hist, fg_hist] = updateHistModel(new_pwp_model, im_patch_color, bg_area, fg_area, target_sz, p.norm_bg_area, p.n_bins, p.grayscale_sequence, bg_hist, fg_hist, learning_rate_pwp);
     end
     
     %% SCALE UPDATE
-    if frame == 1
+    if choosenSimExp == 0
         im_patch_scale = getScaleSubwindow(im, pos, base_target_sz, scale_factor*scale_factors, scale_window, scale_model_sz, p.hog_scale_cell_size);
         xsf = fft(im_patch_scale,[],2);
         new_sf_num = bsxfun(@times, ysf, conj(xsf));
         new_sf_den = sum(xsf .* conj(xsf), 1);
-    end
-    if frame == 1
-        sf_den = new_sf_den;
-        sf_num = new_sf_num;
-    else
+        if frame == 1
+            sf_den = new_sf_den;
+            sf_num = new_sf_num;
+        else
             sf_den = (1 - p.learning_rate_scale) * sf_den + p.learning_rate_scale * new_sf_den;
             sf_num = (1 - p.learning_rate_scale) * sf_num + p.learning_rate_scale * new_sf_num;
+        end
     end
     % update bbox position
     if (frame == 1)
@@ -388,6 +389,8 @@ for frame = 1:num_frames
         for i = 1:expertNum
             expert(i).rect_position(frame,:) = [pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
             expert(i).RobScore(frame) = 1;
+            expert(i).smooth(frame) = 0;
+            expert(i).smoothScore(frame) = 1;
             expert(i).hold(frame,:) = 1;
             expert(i).response = [];
             expert(i).flowscore = 0;
@@ -408,8 +411,6 @@ for frame = 1:num_frames
 %                         im = insertShape(im, 'Rectangle', expert(4).rect_position(frame,:), 'LineWidth', 3, 'Color', 'magenta');
 %                         im = insertShape(im, 'Rectangle', expert(5).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');
 %                         im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red');
-            if evaluate_count ~= 0
-            end
 
             %             im = insertShape(im, 'Rectangle', frect, 'LineWidth', 3, 'Color', 'blue');
             %%% final result
@@ -418,6 +419,9 @@ for frame = 1:num_frames
             %im = insertShape(im, flow, 'DecimationFactor', [5, 5], 'ScaleFactor', 10);
             hold off;
             imshow(im);
+            if frame > 1
+            showInformation(frame, Mode, max_sim, firstsim, meanFirstSim, low_count, search_count, scale_factor);
+            end
             hold on;
             if p.showflow == 1
                 plot(flow, 'DecimationFactor', [5 5], 'ScaleFactor', 10);

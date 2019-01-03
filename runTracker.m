@@ -4,13 +4,14 @@ clear all;
 addpath('./tracker');                  
 addpath('./utility');
 addpath('model','matconvnet/matlab');
+addpath('saimese');
 vl_setupnn();
 %%% Note that the default setting is CPU. TO ENABLE GPU, please recompile the MatConvNet toolbox  
 %vl_compilenn('enableGpu',true, 'CudaRoot', 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0');
 global enableGPU;
 enableGPU = true;
 params.visualization = 1;                  % show output bbox on frame
-params.enableopticalflow = 0;
+params.enableopticalflow = 1;
 params.showflow = 0;
 
 
@@ -40,7 +41,7 @@ params.scale_model_max_area = 32*16;
 %% load all sequence
 base_path = 'sequence/';
 [videonames, img_paths] = load_all_sequence(base_path);
-for i = 2 : size(videonames, 2)
+for i = 12 : size(videonames, 2)
 [img_files, pos, target_sz, video_path] = load_video_info(base_path, videonames(i).str);
 %% start trackerMain.m
 im = imread([img_paths(i).str img_files{1}]);
