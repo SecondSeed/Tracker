@@ -1,5 +1,6 @@
 clear;
 clc;
+
 %% ¼ÓÔØground_truthµÄbox
   seq = struct('name',{'basketball';'biker';'bird1';'bird2';'blurBody';'blurCar1';'blurCar2';'blurCar3';'blurCar4';
                         'blurFace';'blurOwl';'board';'bolt';'bolt2';'box';'boy';'car1';'car2';'car4';'car24';
@@ -22,11 +23,20 @@ clc;
  seq_acc =[ ];
  seq_num =[ ];
  pixel_thres = 20;
+ deal = 0;
+ if deal == 1
+ tigerpath = fullfile(str2, 'tiger1.mat');
+ tiger = load(tigerpath);
+ tiger = tiger.res;
+ res = tiger(6:end,:);
+ save('.\ours\tiger1.mat', 'res');
+ end
  for i = 1 :length(seq)
      true_path = fullfile(str,[seq(i).name '.mat']);
      pred_path = fullfile(str2,[seq(i).name '.mat']);
      load(true_path);
-     load(pred_path);
+     res = load(pred_path);
+     result = res.res;
 %      result=results{1}.res;
      true_center = [truth_box(:,1)+0.5*truth_box(:,3)  truth_box(:,2)+0.5*truth_box(:,4)];
      pred_center = [result(:,1)+0.5*result(:,3)   result(:,2)+0.5*result(:,4)];
@@ -49,7 +59,8 @@ clc;
      true_path = fullfile(str,[seq(i).name '.mat']);
      pred_path = fullfile(str2,[seq(i).name '.mat']);
      load(true_path);
-     load(pred_path);
+     res = load(pred_path);
+     result = res.res;
 %        result=results{1}.res;
 %      ss = sum(result.^2,2);
 %      index = isnan(ss);

@@ -15,18 +15,16 @@ PSRScore(1, num_frames) = 0;
 allFirstSim = 0;
 meanFirstSim = 0;
 IDensemble(1, expertNum) = 0;
-flowScore(1, expertNum) = 0;
 choosenSimExp = 0;
 output_rect_positions(num_frames, 4) = 0;
 Mode = 1;
 low_factor = 0.3;
-enableUpdate = 1;
 search_count = 0;
 searchthreshold = 2;
 lowthreshold = 5;
+low_count = 0;
 meancount = 0;
 meanparam = 0.3;
-bestcfexp = 7;
 evaluate_count = 0;
 
 %saimese_window = make_window(saimese);
@@ -35,10 +33,11 @@ saimese.average_response = 0;
 
 
 % 与相关滤波器有关的专家
-experts_params = ones(expertNum - 1, 1, 3);
+experts_params = ones(expertNum, 1, 3);
 experts_params(:, :, :) = [[1, 0, 0]; [0, 1, 0]; [0, 0, 1]; [0.33, 0.67, 0];...
     [0.33, 0, 0.67]; [0, 0.33, 0.67]; [0.013, 0.33, 0.657]];
 
+score_param = [0.75, 0 ,0.25];
 
 
 % patch of the target + padding
@@ -78,7 +77,7 @@ if mod(p.num_scales,2) == 0
     scale_window = scale_window(2:end);
 else
     scale_window = single(hann(p.num_scales));
-end;
+end
 ss = 1:p.num_scales;
 scale_factors = p.scale_step.^(ceil(p.num_scales/2) - ss);
 if p.scale_model_factor^2 * prod(p.norm_target_sz) > p.scale_model_max_area
@@ -140,7 +139,7 @@ for frame = 1:num_frames
             % Construct multiple experts
             % the weights of High, Middle, Low features are [1, 0.5, 0.02]
             response_cat = cat(3, responseHandLow, responseDeepMiddle, responseDeepHigh);
-            for i = 1: expertNum - 1
+            for i = 1: expertNum
                 expert(i).response =  sum(bsxfun(@times, response_cat, experts_params(i, :, :)), 3);
             end
             
@@ -154,13 +153,11 @@ for frame = 1:num_frames
                 firstsim = fsim;
             end
             first_response = max(response, [], 3);
-            % similarity expert
-            expert(expertNum).response = first_response;
             
             mfr = mean(first_response(:));
             
             center = (1 + p.norm_delta_area) / 2;
-            for i = 1:expertNum - 1
+            for i = 1:expertNum
                 [row, col] = find(expert(i).response == max(expert(i).response(:)), 1);
                 expert(i).pos = pos + ([row, col] - center) / area_resize_factor;
                 expert(i).rect_position(frame,:) = [expert(i).pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
@@ -173,13 +170,13 @@ for frame = 1:num_frames
                 expert(i).smoothScore(frame) = exp(- (expert(i).smooth(frame)).^2/ (2 * p.avg_dim.^2) );
             end
             
-            expert(expertNum).pos = fpos;
-            expert(expertNum).rect_position(frame,:) = [expert(expertNum).pos([2,1]) - fsz([2,1])/2, fsz([2,1])];
-            expert(expertNum).center(frame,:) = [expert(expertNum).rect_position(frame,1)+(expert(expertNum).rect_position(frame,3)-1)/2 expert(expertNum).rect_position(frame,2)+(expert(expertNum).rect_position(frame,4)-1)/2];
-            expert(expertNum).fsim = fsim;
-            expert(expertNum).smooth(frame) = sqrt( sum((expert(expertNum).center(frame,:)-expert(expertNum).center(frame-1,:)).^2) );
-            % smoothness between two frames
-            expert(expertNum).smoothScore(frame) = exp(- (expert(expertNum).smooth(frame)).^2/ (2 * p.avg_dim.^2) );
+%             expert(expertNum).pos = fpos;
+%             expert(expertNum).rect_position(frame,:) = [expert(expertNum).pos([2,1]) - fsz([2,1])/2, fsz([2,1])];
+%             expert(expertNum).center(frame,:) = [expert(expertNum).rect_position(frame,1)+(expert(expertNum).rect_position(frame,3)-1)/2 expert(expertNum).rect_position(frame,2)+(expert(expertNum).rect_position(frame,4)-1)/2];
+%             expert(expertNum).fsim = fsim;
+%             expert(expertNum).smooth(frame) = sqrt( sum((expert(expertNum).center(frame,:)-expert(expertNum).center(frame-1,:)).^2) );
+%             % smoothness between two frames
+%             expert(expertNum).smoothScore(frame) = exp(- (expert(expertNum).smooth(frame)).^2/ (2 * p.avg_dim.^2) );
 
             %compute optical flow
             if p.enableopticalflow == 1
@@ -187,7 +184,7 @@ for frame = 1:num_frames
                 flow = estimateFlow(opticFlow, optic_im);
             end
             
-            % 使用 meanFirstSim 和 meanLastSim 来将相似性分数映射到 0 - 1 之间，
+            % 使用 meanFirstSim 来将相似性分数映射到 0 - 1 之间，
             % 并对 expert 增加 hold 字段， 使相似性分数低于平均值的专家hold字段置false
             expert = calculateRelativeSimilarity(expert, expertNum, meanFirstSim, mfr, frame);
             evaluate_count = evaluate_count + 1;
@@ -203,42 +200,36 @@ for frame = 1:num_frames
                 % 将鲁棒性分数归一化
                 expert = normRobust(expert, expertNum);
                 for i = 1 : expertNum
-                    IDensemble(i) = 0.85 * expert(i).normRobScore + 0.1 * expert(i).flowscore + 0.05 * expert(i).normfsim;
+                    IDensemble(i) = score_param(1) * expert(i).normRobScore + score_param(2) * expert(i).flowscore + score_param(3) * expert(i).normfsim;
                 end
                 meanScore(frame) = sum(IDensemble)/expertNum;
                 [~, ID] = sort(IDensemble, 'descend');
                 pos = expert( ID(1) ).pos;
                 Final_rect_position = expert( ID(1) ).rect_position(frame,:);
-                if ID(1) == expertNum
-                    choosenSimExp = 1;
-                    bestcfexp = ID(2);
-                else
-                    choosenSimExp = 0;
-                    bestcfexp = ID(1);
-                end
+                max_sim = expert(ID(1)).fsim;
             else
                 for i = 1:expertNum, expert(i).RobScore(frame) = 1; end
                 pos = expert(7).pos;
                 Final_rect_position = expert(7).rect_position(frame,:);
-                bestcfexp = 7;
+                max_sim = expert(7).fsim;
             end
             % 最大的相似度都很低， 可能已经丢失目标了
 %             fsim
 %             meanFirstSim
 %             show = meanFirstSim * low_factor
-            if fsim < low_factor * meanFirstSim & low_count >= lowthreshold
+            if max_sim < low_factor * meanFirstSim && low_count >= lowthreshold
                 % 大尺度搜索
                 choosenSimExp = 1;
                 low_count = 0;
                 Mode = 0;
-                enableUpdate = 0;
+
                 [fpos, fsz, fsim] = excuteLargeScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
                 [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, fsim, meancount);
                 Final_rect_position = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
                 search_count = search_count + 1;
-                if search_count >= searchthreshold | fsim > low_factor * meanFirstSim
+                if search_count >= searchthreshold || max_sim > low_factor * meanFirstSim
                     Mode = 1;
-                    enableUpdate = 1;
+
                     search_count = 0;
                 end
             else
@@ -265,14 +256,13 @@ for frame = 1:num_frames
                        
             search_count = search_count + 1;
             [allFirstSim, meancount] = updatemean(allFirstSim, meanparam, firstsim, fsim, meancount);
-            if search_count >= searchthreshold | fsim > low_factor * meanFirstSim
+            if search_count >= searchthreshold || max_sim > low_factor * meanFirstSim
                 Mode = 1;
-                enableUpdate = 1;
+
                 search_count = 0;
             end
         end
         meanFirstSim = allFirstSim / meancount;
-        simrect = [fpos([2,1]) - fsz([2,1])/2, fsz([2,1])];
         %% ADAPTIVE UPDATE
         Score1 = calculatePSR(response_cfilter);
         Score2 = calculatePSR(response_deep{1});
@@ -326,8 +316,6 @@ for frame = 1:num_frames
         % Compute the rectangle with (or close to) params.fixed_area and same aspect ratio as the target bboxgetScaleSubwindow
         area_resize_factor = sqrt(p.fixed_area/prod(bg_area));
     end
-    
-    if enableUpdate == 1
         % extract patch of size bg_area and resize to norm_bg_area
         im_patch_bg = getSubwindow(im, pos, p.norm_bg_area, bg_area);
         % compute feature map, of cf_response_size
@@ -348,7 +336,7 @@ for frame = 1:num_frames
             new_hf_num_deep{ii} = bsxfun(@times, conj(yf), xtf_deep{ii}) / prod(p.cf_response_size);
             new_hf_den_deep{ii} = (conj(xtf_deep{ii}) .* xtf_deep{ii}) / prod(p.cf_response_size);
         end
-    end
+
     
     if frame == 1
         % first frame, train with a single image
@@ -381,7 +369,7 @@ for frame = 1:num_frames
     end
     
     %% SCALE UPDATE
-    if enableUpdate == 1 | frame == 1
+    if frame == 1
         im_patch_scale = getScaleSubwindow(im, pos, base_target_sz, scale_factor*scale_factors, scale_window, scale_model_sz, p.hog_scale_cell_size);
         xsf = fft(im_patch_scale,[],2);
         new_sf_num = bsxfun(@times, ysf, conj(xsf));
@@ -391,10 +379,8 @@ for frame = 1:num_frames
         sf_den = new_sf_den;
         sf_num = new_sf_num;
     else
-        if enableUpdate == 1
             sf_den = (1 - p.learning_rate_scale) * sf_den + p.learning_rate_scale * new_sf_den;
             sf_num = (1 - p.learning_rate_scale) * sf_num + p.learning_rate_scale * new_sf_num;
-        end
     end
     % update bbox position
     if (frame == 1)
@@ -404,8 +390,8 @@ for frame = 1:num_frames
             expert(i).RobScore(frame) = 1;
             expert(i).hold(frame,:) = 1;
             expert(i).response = [];
+            expert(i).flowscore = 0;
         end
-        simrect = [pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
     end
     output_rect_positions(frame,:) = Final_rect_position;
     
@@ -421,10 +407,8 @@ for frame = 1:num_frames
 %                         im = insertShape(im, 'Rectangle', expert(3).rect_position(frame,:), 'LineWidth', 3, 'Color', 'blue');
 %                         im = insertShape(im, 'Rectangle', expert(4).rect_position(frame,:), 'LineWidth', 3, 'Color', 'magenta');
 %                         im = insertShape(im, 'Rectangle', expert(5).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');
-            im = insertShape(im, 'Rectangle', simrect, 'LineWidth', 3, 'Color', 'blue');
 %                         im = insertShape(im, 'Rectangle', expert(7).rect_position(frame,:), 'LineWidth', 3, 'Color', 'red');
             if evaluate_count ~= 0
-            im = insertShape(im, 'Rectangle', expert(bestcfexp).rect_position(frame,:), 'LineWidth', 3, 'Color', 'cyan');
             end
 
             %             im = insertShape(im, 'Rectangle', frect, 'LineWidth', 3, 'Color', 'blue');

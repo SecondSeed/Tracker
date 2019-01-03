@@ -10,7 +10,7 @@ vl_setupnn();
 global enableGPU;
 enableGPU = true;
 params.visualization = 1;                  % show output bbox on frame
-params.enableopticalflow = 1;
+params.enableopticalflow = 0;
 params.showflow = 0;
 
 
@@ -26,7 +26,7 @@ params.lambda = 1e-4;                      % regularization weight
 params.lr_cf_init = 0.01;                  % DCF learning rate
 params.period = 5;                         % time period, \Delta t
 params.update_thres = 0.7;                 % threshold for adaptive update
-params.expertNum = 8; 
+params.expertNum = 7; 
 
 %% scale related
 params.hog_scale_cell_size = 4;            % from DSST 
@@ -40,7 +40,7 @@ params.scale_model_max_area = 32*16;
 %% load all sequence
 base_path = 'sequence/';
 [videonames, img_paths] = load_all_sequence(base_path);
-for i = 55 : size(videonames, 2)
+for i = 2 : size(videonames, 2)
 [img_files, pos, target_sz, video_path] = load_video_info(base_path, videonames(i).str);
 %% start trackerMain.m
 im = imread([img_paths(i).str img_files{1}]);
@@ -66,6 +66,6 @@ initial_net();
 % start the actual tracking
 result = trackerMain(params, im, bg_area, fg_area, area_resize_factor, saimese);
 res = result.res;
-result_path = ['res/' videonames(i).str '.mat'];
+result_path = ['res_no_simexp/' videonames(i).str '.mat'];
 save(result_path, 'res');
 end
