@@ -16,6 +16,7 @@ num_frames = numel(p.img_files);
 meanScore(1, num_frames) = 0;
 PSRScore(1, num_frames) = 0;
 IDensemble(1, expertNum) = 0;
+Score(1, expertNum) = 0;
 output_rect_positions(num_frames, 4) = 0;
 
 allSim = 0;
@@ -50,7 +51,7 @@ if mod(p.num_scales,2) == 0
     scale_window = scale_window(2:end);
 else
     scale_window = single(hann(p.num_scales));
-end;
+end
 ss = 1:p.num_scales;
 scale_factors = p.scale_step.^(ceil(p.num_scales/2) - ss);
 if p.scale_model_factor^2 * prod(p.norm_target_sz) > p.scale_model_max_area
@@ -144,21 +145,17 @@ for frame = 1:num_frames
         
         if frame > period - 1
             for i = 1 : expertNum
-                % expert optical flow reliability
-                if p.enableopticalflow == 1
-                    expert(i).flowscore = calculateOpticalScore(flow, pos, target_sz, expert(i).rect_position(frame, :));
-                end
                 % expert robustness evaluation
                 expert(i).RobScore = RobustnessEva(expert, i, frame, period, weight, expertNum);
-                %                     IDensemble(i) = expert(i).RobScore;
+                IDensemble(i) = expert(i).RobScore;
             end
             % 将鲁棒性分数归一化
             expert = normRobust(expert, expertNum);
             for i = 1 : expertNum
-                IDensemble(i) = score_param(1) * expert(i).normRobScore + score_param(2) * expert(i).flowscore + score_param(3) * expert(i).normfsim;
+                Score(i) = score_param(1) * expert(i).normRobScore + score_param(2) * expert(i).flowscore + score_param(3) * expert(i).normfsim;
             end
             meanScore(frame) = sum(IDensemble)/expertNum;
-            [~, ID] = sort(IDensemble, 'descend');
+            [~, ID] = sort(Score, 'descend');
             pos = expert( ID(1) ).pos;
             Final_rect_position = expert( ID(1) ).rect_position(frame,:);
             max_sim = expert(ID(1)).fsim;
@@ -281,7 +278,7 @@ for frame = 1:num_frames
         new_sf_num = bsxfun(@times, ysf, conj(xsf));
         new_sf_den = sum(xsf .* conj(xsf), 1);
         s_x = scale_factor * base_s_x;
-        if frame == 1,
+        if frame == 1
             sf_den = new_sf_den;
             sf_num = new_sf_num;
         else

@@ -2,7 +2,7 @@ function expert = calculateRelativeSimilarity(expert, expertNum, meanFirstSim, m
 if meanFirstSim == 0
     upFirstSim = max([expert(:).fsim]);
 else
-upFirstSim = 1.1 * meanFirstSim;
+upFirstSim = 2 * meanFirstSim;
 end
 for i = 1 : expertNum
     expert(i).hold(frame,:) = 1;

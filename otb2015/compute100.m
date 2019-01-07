@@ -28,8 +28,10 @@ clc;
  tigerpath = fullfile(str2, 'tiger1.mat');
  tiger = load(tigerpath);
  tiger = tiger.res;
+ if size(tiger, 1) == 354
  res = tiger(6:end,:);
  save('.\ours\tiger1.mat', 'res');
+ end
  end
  for i = 1 :length(seq)
      true_path = fullfile(str,[seq(i).name '.mat']);
