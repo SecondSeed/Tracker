@@ -8,7 +8,8 @@ res = zeros(4, 5);
 im_area = size(im, 1) * size(im, 2);
 if 2 * dis(1) * dis(2) > im_area
     saimese.numScale = 9;
-    [pos, targetSize, Similarity, response] = excuteMultiScaleSearch(im, ltpos, lastSz, firstFeature, saimese, s_x, avgChans);
+    feature = repmat(firstFeature, [1 1 1 3]);
+    [pos, targetSize, Similarity, response] = excuteMultiScaleSearch(im, ltpos, lastSz, feature, saimese, s_x, avgChans);
     saimese.numScale = 3;
 else
 [pos, sz, sim, response] = excuteMultiScaleSearch(im, ltpos, lastSz, firstFeature, saimese, s_x, avgChans);

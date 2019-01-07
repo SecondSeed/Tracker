@@ -23,7 +23,7 @@ clc;
  seq_acc =[ ];
  seq_num =[ ];
  pixel_thres = 20;
- deal = 0;
+ deal = 1;
  if deal == 1
  tigerpath = fullfile(str2, 'tiger1.mat');
  tiger = load(tigerpath);

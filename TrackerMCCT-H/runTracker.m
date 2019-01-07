@@ -27,7 +27,8 @@ params.lambda = 1e-4;                      % regularization weight
 params.lr_cf_init = 0.01;                  % DCF learning rate
 params.period = 5;                         % time period, \Delta t
 params.update_thres = 0.6;                 % threshold for adaptive update
-params.expertNum = 7;     
+params.expertNum = 7;  
+
 
 %% scale related
 params.hog_scale_cell_size = 4;            % from DSST 
@@ -41,7 +42,15 @@ params.scale_model_max_area = 32*16;
 %% load all sequence
 base_path = '../sequence/';
 [videonames, img_paths] = load_all_sequence(base_path);
-for i = 12 : size(videonames, 2)
+score = [[0.95, 0.5, 0]; [0.95, 0, 0.5]; [0.9, 0.5, 0.5]; [0.85, 0.1, 0.5]; [0.85, 0.5, 0.1]; [0.8, 0.5, 0.15]; [0.8, 0.15, 0.5]; [0.8, 0.1, 0.1]];
+hold = [0, 0.05, 0.1, 0.15, 0.2];
+for z = 1 : size(hold)
+    params.hold = hold(z);
+for j = 4 : size(score, 1)
+    params.score = score(j,:);
+    folderpath = [num2str(z) num2str(j)];
+    mkdir(folderpath);
+for i = 1 : size(videonames, 2)
 [img_files, pos, target_sz, video_path] = load_video_info(base_path, videonames(i).str);
 %% start trackerMain.m
 im = imread([img_paths(i).str img_files{1}]);
@@ -66,6 +75,8 @@ saimese = initial_saimese();
 % start the actual tracking
 result = trackerMain(params, im, bg_area, fg_area, area_resize_factor, saimese);
 res = result.res;
-result_path = ['res_no_simexp_h/' videonames(i).str '.mat'];
+result_path = [folderpath '/' videonames(i).str '.mat'];
 save(result_path, 'res');
+end
+end
 end
