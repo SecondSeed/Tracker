@@ -6,7 +6,7 @@ function [params, bg_area, fg_area, area_resize_factor] = initializeAllAreas(im,
         params.padding = 1;   
         params.optical_padding = 0.64;
     else
-        params.padding = 1.8;                              % Normal target.
+        params.padding = 1.5;                              % Normal target.
         params.optical_padding = 1.2;
     end
 	% we want a regular frame surrounding the object

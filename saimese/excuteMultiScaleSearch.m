@@ -1,5 +1,5 @@
 function [targetPosition, targetSize, similarity, response] = excuteMultiScaleSearch(cpu_im, targetPosition, targetSize, z_features, p, s_x, avgChans)
-im = gpuArray(single(cpu_im));
+im = cpu_im;
 window = make_window(p);
 % if grayscale repeat one channel to match filters size
 if(size(im, 3)==1)

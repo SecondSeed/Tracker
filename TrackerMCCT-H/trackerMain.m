@@ -255,7 +255,7 @@ for frame = 1:num_frames
             end
             
             % extract features from first frame
-            [first_feature, s_x, avgChans] = calculate_model_feature(im, pos, target_sz, saimese);
+            [first_feature, base_s_x, avgChans] = calculate_model_feature(im, pos, target_sz, saimese);
             % first frame initialize optical flow model
             if p.enableopticalflow == 1
                 opticFlow = opticalFlowFarneback;
@@ -280,6 +280,7 @@ for frame = 1:num_frames
         xsf = fft(im_patch_scale,[],2);
         new_sf_num = bsxfun(@times, ysf, conj(xsf));
         new_sf_den = sum(xsf .* conj(xsf), 1);
+        s_x = scale_factor * base_s_x;
         if frame == 1,
             sf_den = new_sf_den;
             sf_num = new_sf_num;

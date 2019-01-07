@@ -1,10 +1,9 @@
 
 clc;
 clear all;
-addpath('./tracker');                    
+addpath('./tracker');                  
 addpath('./utility');
 addpath('model','matconvnet/matlab');
-addpath('saimese');
 vl_setupnn();
 %%% Note that the default setting is CPU. TO ENABLE GPU, please recompile the MatConvNet toolbox  
 %vl_compilenn('enableGpu',true, 'CudaRoot', 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v9.0');
@@ -18,7 +17,7 @@ params.showflow = 0;
 
 %% DCF related 
 params.hog_cell_size = 4;
-params.fixed_area = 150^2;                 % standard area to which we resize the target
+params.fixed_area = 200^2;                 % standard area to which we resize the target
 params.n_bins = 2^5;                       % number of bins for the color histograms (bg and fg models)
 params.lr_pwp_init = 0.01;                 % bg and fg color models learning rate 
 params.inner_padding = 0.2;                % defines inner area used to sample colors from the foreground
@@ -26,9 +25,8 @@ params.output_sigma_factor = 0.1;          % standard deviation for the desired 
 params.lambda = 1e-4;                      % regularization weight
 params.lr_cf_init = 0.01;                  % DCF learning rate
 params.period = 5;                         % time period, \Delta t
-params.update_thres = 0.6;                 % threshold for adaptive update
-params.expertNum = 7;  
-
+params.update_thres = 0.7;                 % threshold for adaptive update
+params.expertNum = 7; 
 
 %% scale related
 params.hog_scale_cell_size = 4;            % from DSST 
@@ -36,21 +34,13 @@ params.learning_rate_scale = 0.025;
 params.scale_sigma_factor = 1/2;
 params.num_scales = 33;       
 params.scale_model_factor = 1.0;
-params.scale_step = 1.02;
+params.scale_step = 1.03;
 params.scale_model_max_area = 32*16;
 
 %% load all sequence
-base_path = '../sequence/';
+base_path = 'sequence/';
 [videonames, img_paths] = load_all_sequence(base_path);
-score = [[0.95, 0, 0.5]; [0.9, 0, 0.1]; [0.85, 0, 0.15]; [0.8, 0, 0.2]; [0.75, 0, 0.25]; [0.7, 0, 0.3]; [0.65, 0, 0.35]; [0.6, 0, 0.4]];
-hold = [0, 0.05, 0.1, 0.15, 0.2];
-for z = 1 : size(hold)
-    params.hold = hold(z);
-for j = 1 : size(score, 1)
-    params.score = score(j,:);
-    folderpath = [num2str(z) num2str(j)];
-    mkdir(folderpath);
-for i = 1 : size(videonames, 2)
+for i = 38 : size(videonames, 2)
 [img_files, pos, target_sz, video_path] = load_video_info(base_path, videonames(i).str);
 %% start trackerMain.m
 im = imread([img_paths(i).str img_files{1}]);
@@ -72,11 +62,10 @@ params.target_sz = target_sz;
 % end
 % ³õÊ¼»¯ÍøÂç
 saimese = initial_saimese();
+initial_net();
 % start the actual tracking
 result = trackerMain(params, im, bg_area, fg_area, area_resize_factor, saimese);
 res = result.res;
-result_path = [folderpath '/' videonames(i).str '.mat'];
+result_path = ['res_no_simexp/' videonames(i).str '.mat'];
 save(result_path, 'res');
-end
-end
 end
