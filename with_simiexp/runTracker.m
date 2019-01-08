@@ -44,9 +44,9 @@ base_path = '../sequence/';
 [videonames, img_paths] = load_all_sequence(base_path);
 score = [[0.95, 0, 0.5]; [0.9, 0, 0.1]; [0.85, 0, 0.15]; [0.8, 0, 0.2]; [0.75, 0, 0.25]; [0.7, 0, 0.3]; [0.65, 0, 0.35]; [0.6, 0, 0.4]];
 hold = [0, 0.05, 0.1, 0.15, 0.2];
-for z = 1 : size(hold)
+for z = 4 : size(hold, 2)
     params.hold = hold(z);
-for j = 1 : size(score, 1)
+for j = 6 : size(score, 1)
     params.score = score(j,:);
     folderpath = [num2str(z) num2str(j)];
     mkdir(folderpath);

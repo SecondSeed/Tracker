@@ -109,8 +109,9 @@ for frame = 1:num_frames
             expert(i).response = mexResize(response_cf, p.norm_delta_area,'auto');
         end
         
-        
-        [fpos, fsz, fsim, response] = excuteMultiScaleSearch(im, pos, target_sz, first_feature, saimese, s_x, avgChans);
+        [last_features, s_x, avgChans] = calculate_model_feature(last_im, pos, target_sz, saimese);
+        last_im = im;
+        [fpos, fsz, fsim, response] = excuteMultiScaleSearch(im, pos, target_sz, last_features, saimese, s_x, avgChans);
         if frame == 2
             firstsim = fsim;
         end
@@ -259,6 +260,8 @@ for frame = 1:num_frames
                 optic_im = makeMask(im, pos, p.optical_area);
                 flow = estimateFlow(opticFlow, optic_im);
             end
+            
+            last_im = im;
         else
             for i = 1 : expertNum
                 % subsequent frames, update the model by linear interpolation
